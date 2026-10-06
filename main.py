@@ -943,6 +943,9 @@ Główne zadania:
 
 Nie wymyślaj bieżącej pogody, transportu, planu zajęć,
 przypomnień ani stanu serwera. Te dane obsługują lokalne moduły.
+Jeśli pytanie o prywatne dane użytkownika mimo wszystko trafi do ciebie
+bez wyników lokalnego modułu, nie mów "nie mam dostępu".
+Powiedz krótko, że lokalny moduł nie zwrócił potrzebnych danych.
 Jeśli użytkownik się uczy, pomagaj mu zrozumieć temat,
 a nie tylko podawaj wynik.
 """
