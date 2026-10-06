@@ -1,3 +1,4 @@
+import os
 import queue
 import threading
 import time
@@ -5,6 +6,16 @@ import time
 from skills.proactive import class_notification_due
 from skills.reminders import has_due_reminders, pop_due_reminders
 from skills.web_commands import has_pending_commands, pop_pending_commands
+
+PROACTIVE_CHECK_SECONDS = max(
+    30,
+    int(
+        os.getenv(
+            "PROACTIVE_CHECK_SECONDS",
+            "60",
+        )
+    ),
+)
 
 
 class BackgroundEvents:
@@ -79,7 +90,7 @@ class BackgroundEvents:
 
             now = time.monotonic()
 
-            if now - self._last_class_check >= 300:
+            if now - self._last_class_check >= PROACTIVE_CHECK_SECONDS:
                 self._last_class_check = now
 
                 try:
