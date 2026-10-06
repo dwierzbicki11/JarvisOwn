@@ -6,6 +6,7 @@ import time
 from skills.proactive import class_notification_due, headphone_battery_notification_due
 from skills.focus import pop_due_focus_notice
 from skills.reminders import has_due_reminders, pop_due_reminders
+from skills.scheduled_briefing import briefing_due
 from skills.tasks import pop_due_task_notices
 from skills.web_commands import has_pending_commands, pop_pending_commands
 
@@ -59,6 +60,16 @@ FOCUS_CHECK_SECONDS = max(
     ),
 )
 
+BRIEFING_CHECK_SECONDS = max(
+    30,
+    int(
+        os.getenv(
+            "BRIEFING_CHECK_SECONDS",
+            "60",
+        )
+    ),
+)
+
 
 class BackgroundEvents:
     def __init__(self):
@@ -69,6 +80,7 @@ class BackgroundEvents:
         self._last_battery_check = 0.0
         self._last_task_check = 0.0
         self._last_focus_check = 0.0
+        self._last_briefing_check = 0.0
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -237,6 +249,27 @@ class BackgroundEvents:
                 except Exception as exc:
                     print(
                         f"[BACKGROUND FOCUS ERROR] {exc}",
+                        flush=True,
+                    )
+
+            if now - self._last_briefing_check >= BRIEFING_CHECK_SECONDS:
+                self._last_briefing_check = now
+
+                try:
+                    kind = briefing_due()
+
+                    if kind:
+                        self.queue.put(
+                            {
+                                "type": "briefing",
+                                "kind": kind,
+                                "text": "scheduled briefing",
+                            }
+                        )
+
+                except Exception as exc:
+                    print(
+                        f"[BACKGROUND BRIEFING ERROR] {exc}",
                         flush=True,
                     )
 
