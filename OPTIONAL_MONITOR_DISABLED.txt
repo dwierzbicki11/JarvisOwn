@@ -1,0 +1,14 @@
+Monitor/kiosk jest obecnie CELOWO wyłączony.
+
+Powód:
+po podłączeniu HDMI na tym Raspberry Pi 4 Wi-Fi 2.4 GHz spadało
+z około RX 26 Mbit/s do około RX 2 Mbit/s.
+
+Aktualny tryb:
+- JARVIS core na RPi,
+- GUI FastAPI nasłuchuje na 0.0.0.0:8765,
+- stronę otwierasz na laptopie/telefonie/tablecie:
+  http://192.168.1.112:8765
+
+Nie włączaj automatycznie Cage/Chromium, dopóki problem EMI/HDMI
+nie zostanie rozwiązany lub RPi nie przejdzie na stabilne 5 GHz/Ethernet.

@@ -1,0 +1,9 @@
+# ============================================================
+# JARVIS DISPLAY
+# ============================================================
+if [ "$(tty)" = "/dev/tty1" ] \
+   && [ -z "$SSH_CONNECTION" ] \
+   && [ -z "$WAYLAND_DISPLAY" ]
+then
+    exec /home/zonderq/jarvis/start-kiosk.sh
+fi

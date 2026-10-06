@@ -1,0 +1,13 @@
+groq
+python-dotenv
+psutil
+requests
+piper-tts
+icalendar
+recurring-ical-events
+gtfs-realtime-bindings
+fastapi
+uvicorn
+webrtcvad-wheels
+openwakeword
+numpy

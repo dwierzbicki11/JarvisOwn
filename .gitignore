@@ -1,0 +1,52 @@
+# Sekrety
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime
+runtime/
+cache/
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.pid
+
+# Modele głosowe
+voices/
+*.onnx
+*.onnx.json
+*.bin
+
+# Prywatne materiały
+study_materials/*
+!study_materials/README.txt
+
+# Audio
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Stare wersje / backupy
+*.bak
+*.backup
+*.backup-*
+main.py.audio-backup
+main.py.pre-*
+main.py.v*-backup
+main.py.v*.bak
+
+# Edytory / system
+.DS_Store
+.idea/
+.vscode/
+*~

@@ -1,0 +1,20 @@
+[Unit]
+Description=JARVIS Voice Core
+After=network-online.target pipewire.service wireplumber.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zonderq/jarvis
+ExecStartPre=/home/zonderq/jarvis/wait-audio.sh
+ExecStart=/home/zonderq/jarvis/.venv/bin/python /home/zonderq/jarvis/main.py
+Restart=on-failure
+RestartSec=5
+Nice=5
+CPUWeight=40
+IOWeight=30
+MemoryHigh=1100M
+MemoryMax=1500M
+
+[Install]
+WantedBy=default.target

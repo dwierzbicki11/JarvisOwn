@@ -1,0 +1,19 @@
+[Unit]
+Description=JARVIS GUI/API (LAN)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zonderq/jarvis
+ExecStart=/home/zonderq/jarvis/.venv/bin/uvicorn jarvis_gui:app --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=3
+Nice=10
+CPUWeight=20
+IOWeight=20
+MemoryHigh=350M
+MemoryMax=500M
+
+[Install]
+WantedBy=default.target
