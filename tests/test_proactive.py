@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from skills.proactive import class_notification_due
+from skills.proactive import class_notification_due, headphone_battery_notification_due
 
 
 TZ = ZoneInfo("Europe/Warsaw")
@@ -150,6 +150,64 @@ class ProactiveTests(unittest.TestCase):
         self.assertIn(
             "C01",
             answer,
+        )
+
+    @patch(
+        "skills.proactive._save_state",
+    )
+    @patch(
+        "skills.proactive._load_state",
+        return_value={},
+    )
+    @patch(
+        "skills.proactive.bluetooth_battery",
+        return_value={
+            "connected": True,
+            "available": True,
+            "percentage": 18,
+        },
+    )
+    def test_low_headphones_battery_notice(
+        self,
+        battery,
+        load_state,
+        save_state,
+    ):
+        answer = headphone_battery_notification_due()
+
+        self.assertIsNotNone(answer)
+        self.assertIn(
+            "18 procent",
+            answer,
+        )
+
+    @patch(
+        "skills.proactive._save_state",
+    )
+    @patch(
+        "skills.proactive._load_state",
+        return_value={
+            "headphones_battery": {
+                "notified_tier": "low",
+            }
+        },
+    )
+    @patch(
+        "skills.proactive.bluetooth_battery",
+        return_value={
+            "connected": True,
+            "available": True,
+            "percentage": 18,
+        },
+    )
+    def test_low_headphones_battery_notice_once(
+        self,
+        battery,
+        load_state,
+        save_state,
+    ):
+        self.assertIsNone(
+            headphone_battery_notification_due()
         )
 
     @patch(
