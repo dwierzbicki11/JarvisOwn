@@ -49,6 +49,13 @@ from skills.reminders import (
     format_pending,
     parse_reminder_command,
 )
+from skills.tasks import (
+    add_task,
+    complete_latest as complete_latest_task,
+    delete_latest as delete_latest_task,
+    format_pending as format_pending_tasks,
+    parse_task_command,
+)
 from skills.route_planner import (
     CLASS_BUFFER_MINUTES,
     HOME_STOP,
@@ -1518,6 +1525,122 @@ def process_memory_command(
     return None
 
 
+def process_task_command(
+    text,
+    lower,
+):
+    parsed = parse_task_command(
+        text
+    )
+
+    if parsed:
+        task_id = add_task(
+            parsed["text"],
+            due_at=parsed[
+                "due_at"
+            ],
+            priority=parsed[
+                "priority"
+            ],
+        )
+
+        if task_id is None:
+            return (
+                "Nie udało mi się dodać zadania."
+            )
+
+        answer = (
+            "Dodałem zadanie: "
+            + parsed["text"]
+            + "."
+        )
+
+        if parsed[
+            "priority"
+        ]:
+            answer = (
+                "Dodałem pilne zadanie: "
+                + parsed["text"]
+                + "."
+            )
+
+        if parsed[
+            "due_at"
+        ]:
+            answer += (
+                " Termin "
+                + parsed[
+                    "due_at"
+                ].strftime(
+                    "%d.%m o %H:%M"
+                )
+                + "."
+            )
+
+        return answer
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "co mam do zrobienia",
+            "jakie mam zadania",
+            "pokaż zadania",
+            "pokaz zadania",
+            "lista zadań",
+            "lista zadan",
+        )
+    ):
+        return format_pending_tasks(
+            limit=7
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "oznacz ostatnie zadanie jako zrobione",
+            "ostatnie zadanie zrobione",
+            "skończyłem ostatnie zadanie",
+            "skonczylem ostatnie zadanie",
+            "zamknij ostatnie zadanie",
+        )
+    ):
+        completed = complete_latest_task()
+
+        if not completed:
+            return (
+                "Nie masz aktywnych zadań."
+            )
+
+        return (
+            "Oznaczyłem jako zrobione: "
+            + completed
+            + "."
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "usuń ostatnie zadanie",
+            "usun ostatnie zadanie",
+            "skasuj ostatnie zadanie",
+        )
+    ):
+        removed = delete_latest_task()
+
+        if not removed:
+            return (
+                "Nie masz aktywnych zadań."
+            )
+
+        return (
+            "Usunąłem zadanie: "
+            + removed
+            + "."
+        )
+
+    return None
+
+
 def process_reminder_command(
     text,
     lower,
@@ -1731,6 +1854,15 @@ def process_command(text):
 
     # Pamięć.
     answer = process_memory_command(
+        text,
+        lower,
+    )
+
+    if answer:
+        return answer
+
+    # Zadania do zrobienia.
+    answer = process_task_command(
         text,
         lower,
     )
