@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from skills.pk_calendar import (
     TIMEZONE,
+    _normalize_calendar_text,
     answer_calendar_question,
 )
 
@@ -72,6 +73,14 @@ class CalendarRouterTests(unittest.TestCase):
                 text,
                 context_turns=context_turns,
             )
+
+    def test_polish_l_normalization(self):
+        self.assertEqual(
+            _normalize_calendar_text(
+                "Kiedy będę miał analizę?"
+            ),
+            "kiedy bede mial analize",
+        )
 
     def test_future_tense_laboratory_query_stays_local(self):
         answer = self.answer(
