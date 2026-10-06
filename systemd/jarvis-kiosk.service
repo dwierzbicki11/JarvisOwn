@@ -8,6 +8,8 @@ Wants=graphical-session.target
 [Service]
 Type=simple
 Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=%t
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=%t/bus
 Environment=JARVIS_KIOSK_URL=http://127.0.0.1:8765
 WorkingDirectory=/home/zonderq/jarvis
 ExecStart=/home/zonderq/jarvis/tools/launch_kiosk.sh
