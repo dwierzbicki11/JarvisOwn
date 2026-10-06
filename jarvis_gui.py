@@ -104,6 +104,7 @@ def jarvis_state():
         "study_mode": None,
         "exam_mode": False,
         "last_latency": {},
+        "speaker": {},
         "updated": 0,
     }
 
