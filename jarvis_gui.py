@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from skills.conversation_history import recent_turns
 from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
 from skills.reminders import pending_reminders
@@ -380,6 +381,9 @@ def command(request: CommandRequest):
 def status():
     return {
         "jarvis": jarvis_state(),
+        "history": recent_turns(
+            limit=8
+        ),
         "clock": {
             "time": datetime.now().strftime(
                 "%H:%M:%S"
