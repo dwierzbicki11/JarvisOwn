@@ -137,6 +137,16 @@ ACTIVE_LISTEN_TIMEOUT = float(
         "8",
     )
 )
+
+AUDIO_RECONNECT_SECONDS = max(
+    5.0,
+    float(
+        os.getenv(
+            "AUDIO_RECONNECT_SECONDS",
+            "15",
+        )
+    ),
+)
 BARGE_IN_ENABLED = os.getenv(
     "BARGE_IN_ENABLED",
     "1",
@@ -2603,6 +2613,7 @@ def main():
     last_interaction = (
         time.monotonic()
     )
+    last_audio_retry = 0.0
 
     background_events.start()
 
@@ -2668,6 +2679,26 @@ def main():
                     continue
 
                 if reason != "wake":
+                    retry_now = time.monotonic()
+
+                    if (
+                        retry_now - last_audio_retry
+                        >= AUDIO_RECONNECT_SECONDS
+                    ):
+                        last_audio_retry = retry_now
+
+                        try:
+                            print(
+                                "🎧 Ponawiam przygotowanie audio...",
+                                flush=True,
+                            )
+                            prepare_audio()
+                        except Exception as exc:
+                            print(
+                                f"[AUDIO RETRY] {exc}",
+                                flush=True,
+                            )
+
                     time.sleep(0.5)
                     continue
 
