@@ -186,6 +186,12 @@ def source_id():
 
 
 def _profile_index(dev_id, profile_name):
+    """
+    Zwraca indeks profilu PipeWire z EnumProfile.
+
+    Nie dzielimy outputu po "Object:", bo ten tekst występuje też
+    wewnątrz nazw pól Spa:Pod:Object:Param:* i rozcinał poprzedni parser.
+    """
     result = _run(
         [
             "pw-cli",
@@ -196,22 +202,77 @@ def _profile_index(dev_id, profile_name):
         timeout=5,
     )
 
-    blocks = result.stdout.split("Object:")
+    if result.returncode != 0:
+        return None
 
-    for block in blocks:
-        if f'String "{profile_name}"' not in block:
-            continue
+    pattern = re.compile(
+        r"Profile:index.*?\n\s+Int\s+(\d+)"
+        r".*?Profile:name.*?\n\s+String\s+\"([^\"]+)\"",
+        flags=re.DOTALL,
+    )
 
-        match = re.search(
-            r"Profile:index.*?\n\s+Int\s+(\d+)",
-            block,
-            flags=re.DOTALL,
-        )
+    for match in pattern.finditer(result.stdout):
+        index = int(match.group(1))
+        name = match.group(2)
 
-        if match:
-            return int(match.group(1))
+        if name == profile_name:
+            return index
 
     return None
+
+
+def active_profile(dev_id):
+    """
+    Zwraca informacje o faktycznie aktywnym profilu urządzenia.
+    """
+    result = _run(
+        [
+            "pw-cli",
+            "enum-params",
+            str(dev_id),
+            "Profile",
+        ],
+        timeout=5,
+    )
+
+    if result.returncode != 0:
+        return None
+
+    index_match = re.search(
+        r"Profile:index.*?\n\s+Int\s+(\d+)",
+        result.stdout,
+        flags=re.DOTALL,
+    )
+    name_match = re.search(
+        r"Profile:name.*?\n\s+String\s+\"([^\"]+)\"",
+        result.stdout,
+        flags=re.DOTALL,
+    )
+    desc_match = re.search(
+        r"Profile:description.*?\n\s+String\s+\"([^\"]+)\"",
+        result.stdout,
+        flags=re.DOTALL,
+    )
+
+    if not name_match:
+        return None
+
+    description = (
+        desc_match.group(1)
+        if desc_match
+        else name_match.group(1)
+    )
+
+    return {
+        "index": (
+            int(index_match.group(1))
+            if index_match
+            else None
+        ),
+        "name": name_match.group(1),
+        "description": description,
+        "msbc": "msbc" in description.lower(),
+    }
 
 
 def force_msbc():
@@ -254,6 +315,25 @@ def force_msbc():
         return False
 
     time.sleep(BT_SETTLE_SECONDS)
+
+    active = active_profile(dev_id)
+
+    if not active:
+        print(
+            "⚠️ Ustawiono profil HFP, ale nie udało się odczytać "
+            "aktywnego profilu.",
+            flush=True,
+        )
+        return True
+
+    if active["name"] != "headset-head-unit":
+        print(
+            "⚠️ PipeWire nie utrzymał profilu HFP: "
+            + active["description"],
+            flush=True,
+        )
+        return False
+
     return True
 
 
@@ -310,18 +390,36 @@ def prepare_audio():
         )
         return False
 
-    force_msbc()
+    msbc_requested = BT_FORCE_MSBC
+    msbc_set = force_msbc()
 
     # Zmiana profilu tworzy nowe nody, więc chwilę czekamy.
     time.sleep(BT_SETTLE_SECONDS)
 
     sink, source = set_defaults()
+    dev_id = device_id()
+    profile = active_profile(dev_id) if dev_id is not None else None
+
+    if profile:
+        codec_status = (
+            "mSBC=active"
+            if profile["msbc"]
+            else f"profile={profile['description']}"
+        )
+    elif msbc_requested:
+        codec_status = (
+            "mSBC=unverified"
+            if msbc_set
+            else "mSBC=failed"
+        )
+    else:
+        codec_status = "mSBC=disabled"
 
     print(
         "🎧 Audio: "
         f"sink={sink}, source={source}, "
         f"mic={MIC_TARGET}, "
-        f"mSBC={'on' if BT_FORCE_MSBC else 'off'}",
+        f"{codec_status}",
         flush=True,
     )
 
