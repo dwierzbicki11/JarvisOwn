@@ -33,7 +33,40 @@ fi
 
 echo
 echo "1/7 Aktualizacja repo..."
-git -C "$SOURCE_DIR" pull --ff-only
+
+pull_ok=0
+
+for attempt in 1 2 3 4 5 6
+do
+    if git -C "$SOURCE_DIR" pull --ff-only; then
+        pull_ok=1
+        break
+    fi
+
+    echo
+    echo "GitHub chwilowo niedostępny (próba $attempt/6)."
+
+    if getent hosts github.com >/dev/null 2>&1; then
+        echo "DNS github.com: OK — ponawiam za 10 s."
+    else
+        echo "DNS github.com: BRAK — czekam na sieć/DNS po starcie systemu."
+    fi
+
+    sleep 10
+done
+
+if [[ "$pull_ok" -ne 1 ]]; then
+    echo
+    echo "BŁĄD: nie udało się połączyć z GitHub po 6 próbach."
+    echo "Runtime nie został zmieniony."
+    echo
+    echo "Diagnostyka:"
+    echo "  ip route"
+    echo "  getent hosts github.com"
+    echo "  tailscale status"
+    echo "  resolvectl status"
+    exit 6
+fi
 
 if [[ -n "$(git -C "$SOURCE_DIR" status --porcelain)" ]]; then
     echo "BŁĄD: Repozytorium ma lokalne niezatwierdzone zmiany."
