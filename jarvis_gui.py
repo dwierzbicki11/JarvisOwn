@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from skills.conversation_history import recent_turns
 from skills.focus import current_focus
 from skills.audio_manager import bluetooth_battery
+from skills.background_cache import BackgroundCache
 from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
 from skills.proactive import proactive_status
@@ -55,7 +56,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
-cache = {}
+status_cache = BackgroundCache()
 
 
 class CommandRequest(BaseModel):
@@ -66,37 +67,14 @@ def cached(
     name,
     ttl,
     function,
+    default=None,
 ):
-    now = time.monotonic()
-    old = cache.get(name)
-
-    if (
-        old
-        and now - old["time"] < ttl
-    ):
-        return old["value"]
-
-    try:
-        value = function()
-
-        cache[name] = {
-            "time": now,
-            "value": value,
-        }
-
-        return value
-
-    except Exception as exc:
-        print(
-            f"[GUI CACHE {name}] {exc}",
-            flush=True,
-        )
-
-        return (
-            old["value"]
-            if old
-            else None
-        )
+    return status_cache.get(
+        name,
+        ttl,
+        function,
+        default=default,
+    )
 
 
 def jarvis_state():
@@ -249,7 +227,7 @@ def system_data():
     return {
         "cpu": round(
             psutil.cpu_percent(
-                interval=0.1
+                interval=None
             )
         ),
         "ram": round(
@@ -367,6 +345,80 @@ def reminder_data():
     ]
 
 
+def warm_status_cache():
+    """
+    Rozpocznij pobieranie wolniejszych danych bez blokowania strony.
+    """
+    cached(
+        "weather",
+        300,
+        weather_data,
+    )
+    cached(
+        "class",
+        120,
+        next_class_data,
+    )
+    cached(
+        "transport",
+        60,
+        lambda: next_departures(
+            HOME_STOP,
+            limit=3,
+        ),
+    )
+    cached(
+        "reminders",
+        5,
+        reminder_data,
+        default=[],
+    )
+    cached(
+        "tasks",
+        5,
+        task_data,
+        default=[],
+    )
+    cached(
+        "network",
+        5,
+        wifi_status,
+    )
+    cached(
+        "raid",
+        5,
+        raid_status,
+    )
+    cached(
+        "services",
+        15,
+        lambda: {
+            "docker": docker_data(),
+            "pihole": pihole_data(),
+        },
+    )
+    cached(
+        "study",
+        30,
+        study_index_status,
+    )
+    cached(
+        "headphones",
+        10,
+        bluetooth_battery,
+    )
+    cached(
+        "proactive",
+        30,
+        proactive_status,
+    )
+
+
+@app.on_event("startup")
+def startup_cache_warmup():
+    warm_status_cache()
+
+
 @app.get("/")
 def index():
     return HTMLResponse(
@@ -445,11 +497,13 @@ def status():
             "reminders",
             5,
             reminder_data,
+            default=[],
         ),
         "tasks": cached(
             "tasks",
             5,
             task_data,
+            default=[],
         ),
         "focus": cached(
             "focus",
@@ -495,4 +549,5 @@ def status():
             30,
             proactive_status,
         ),
+        "cache": status_cache.state(),
     }
