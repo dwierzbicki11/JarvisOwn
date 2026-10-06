@@ -90,6 +90,7 @@ body[data-state="sleeping"] .state{opacity:.22}
     <div class="state" id="jarvis-state">CZUWANIE</div>
     <div class="mode" id="jarvis-mode">TRYB: STANDARD</div>
     <div class="mode" id="speaker-state">GŁOS: --</div>
+    <div class="mode" id="focus-state">SKUPIENIE: --</div>
     <div class="mode" id="latency">LATENCY: --</div>
   </div>
 
@@ -241,6 +242,16 @@ async function update(){
         `GŁOS: ${speaker.accepted?"TWÓJ":"ODRZUCONY"} ${percent}% / próg ${threshold}%`;
     }else{
       speakerElement.textContent="GŁOS: WERYFIKACJA AKTYWNA";
+    }
+
+    const focus=data.focus||null;
+    const focusElement=document.getElementById("focus-state");
+
+    if(focus && !focus.expired){
+      focusElement.textContent=
+        `SKUPIENIE: ${(focus.label||"NAUKA").toUpperCase()} • ${focus.remaining_minutes??0} min`;
+    }else{
+      focusElement.textContent="SKUPIENIE: OFF";
     }
 
     document.getElementById("latency").textContent=`LATENCY: ${renderLatency(data.jarvis.last_latency)}`;
