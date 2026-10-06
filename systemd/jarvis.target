@@ -2,7 +2,7 @@
 Description=JARVIS Voice Assistant (core + web)
 Requires=jarvis-core.service jarvis-web.service
 After=network-online.target
-Wants=network-online.target
+Wants=network-online.target jarvis-kiosk.service
 
 [Install]
 WantedBy=default.target
