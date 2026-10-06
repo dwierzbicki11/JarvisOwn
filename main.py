@@ -43,6 +43,7 @@ from skills.pk_calendar import (
     get_next_class,
     get_schedule,
 )
+from skills.scheduled_briefing import format_briefing_status
 from skills.reminders import (
     add_reminder,
     cancel_latest,
@@ -1952,6 +1953,24 @@ def process_command(text):
     ):
         clear_history()
         return "Wyczyściłem historię tej rozmowy."
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "kiedy briefing",
+            "kiedy jest briefing",
+            "kiedy następny briefing",
+            "kiedy nastepny briefing",
+            "status briefingu",
+            "automatyczny briefing",
+        )
+    ):
+        print(
+            "🎯 INTENT briefing_status",
+            flush=True,
+        )
+
+        return format_briefing_status()
 
     # Pamięć.
     answer = process_memory_command(
