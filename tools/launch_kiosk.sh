@@ -5,6 +5,11 @@ URL="${JARVIS_KIOSK_URL:-http://127.0.0.1:8765}"
 DISPLAY_VALUE="${DISPLAY:-:0}"
 
 export DISPLAY="$DISPLAY_VALUE"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+if [[ -S "$XDG_RUNTIME_DIR/wayland-0" ]]; then
+    export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+fi
 
 echo "=== JARVIS KIOSK ==="
 echo "DISPLAY=$DISPLAY"
