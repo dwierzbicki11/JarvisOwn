@@ -76,6 +76,8 @@ body[data-state="sleeping"] .state{opacity:.22}
       <div class="big" id="class-time">--</div>
       <div class="normal" id="class-name">Pobieranie planu...</div>
       <div class="normal" id="class-location"></div>
+      <br>
+      <div class="small" id="study-index">Materiały: --</div>
     </div>
   </div>
 
@@ -223,6 +225,12 @@ async function update(){
       document.getElementById("class-name").textContent="Brak zajęć";
       document.getElementById("class-location").textContent="";
     }
+
+    const study=data.study||{};
+    document.getElementById("study-index").textContent=
+      study.error
+        ? "Materiały: błąd indeksu"
+        : `Materiały: ${study.files??0} plików • ${study.chunks??0} fragmentów`;
 
     document.getElementById("transport").textContent=data.transport||"Brak danych";
 
