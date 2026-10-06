@@ -61,6 +61,35 @@ try:
 except Exception as exc:
     fail(f"SQLite FTS5 niedostępny: {exc}")
 
+try:
+    from skills.speaker_verify import profile_status
+
+    speaker = profile_status()
+
+    if speaker.get("enabled"):
+        if speaker.get("enrolled"):
+            ok(
+                "speaker verification: aktywne, "
+                f"próbki={speaker.get('samples', '?')}, "
+                f"próg={speaker.get('threshold', '?')}"
+            )
+        else:
+            warn(
+                "speaker verification włączone, ale brak poprawnego profilu"
+            )
+    elif speaker.get("enrolled"):
+        ok(
+            "speaker profile gotowy; verification obecnie wyłączone"
+        )
+    else:
+        warn(
+            "speaker verification wyłączone i brak profilu; "
+            "opcjonalnie uruchom tools/enroll_speaker.py"
+        )
+
+except Exception as exc:
+    warn(f"speaker verification: {exc}")
+
 voice = os.getenv(
     "TTS_VOICE",
     "pl_PL-mc_speech-medium",
