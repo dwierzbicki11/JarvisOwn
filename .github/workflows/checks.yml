@@ -28,6 +28,6 @@ jobs:
         run: |
           python -m compileall -q             main.py             jarvis_gui.py             skills             tools             tests
 
-      - name: Calendar routing regression tests
+      - name: Unit tests
         run: |
-          python -m unittest -v tests.test_calendar_router
+          python -m unittest discover -v tests
