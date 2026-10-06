@@ -1,0 +1,33 @@
+name: JARVIS checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install             python-dotenv             requests             icalendar             recurring-ical-events
+
+      - name: Compile Python sources
+        run: |
+          python -m compileall -q             main.py             jarvis_gui.py             skills             tools             tests
+
+      - name: Calendar routing regression tests
+        run: |
+          python -m unittest -v tests.test_calendar_router
