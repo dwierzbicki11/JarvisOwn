@@ -1743,6 +1743,26 @@ def process_command(text):
             f"{status['chunks']} fragmentów."
         )
 
+    if any(
+        marker in lower
+        for marker in (
+            "przepytaj mnie z moich materiałów",
+            "przepytaj mnie z moich materialow",
+            "zrób quiz z moich materiałów",
+            "zrob quiz z moich materialow",
+        )
+    ):
+        print(
+            "🎯 INTENT study_rag_quiz",
+            flush=True,
+        )
+
+        return answer_from_study_rag(
+            text,
+            quiz=True,
+        )
+
+
     rag_markers = (
         "na podstawie moich materiałów",
         "na podstawie moich materialow",
@@ -1771,25 +1791,6 @@ def process_command(text):
 
         return answer_from_study_rag(
             text
-        )
-
-    if any(
-        marker in lower
-        for marker in (
-            "przepytaj mnie z moich materiałów",
-            "przepytaj mnie z moich materialow",
-            "zrób quiz z moich materiałów",
-            "zrob quiz z moich materialow",
-        )
-    ):
-        print(
-            "🎯 INTENT study_rag_quiz",
-            flush=True,
-        )
-
-        return answer_from_study_rag(
-            text,
-            quiz=True,
         )
 
     if (
