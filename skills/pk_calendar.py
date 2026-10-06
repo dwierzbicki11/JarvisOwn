@@ -601,31 +601,27 @@ def answer_calendar_question(
         )
 
         if short_followup:
-            previous = " ".join(
-                (
-                    str(turn.get("user", ""))
-                    + " "
-                    + str(turn.get("assistant", ""))
-                )
-                for turn in context_turns[-3:]
-            )
+            # Ustal kontekst z poprzedniego pytania użytkownika,
+            # a nie z treści odpowiedzi JARVIS-a. Dzięki temu działa
+            # także po odpowiedziach typu "Najbliższe terminy...".
+            for turn in reversed(
+                context_turns[-3:]
+            ):
+                previous_user = str(
+                    turn.get(
+                        "user",
+                        "",
+                    )
+                ).strip()
 
-            previous_norm = _normalize_calendar_text(
-                previous
-            )
-
-            looks_like_question = any(
-                marker in previous_norm
-                for marker in (
-                    "zajecia",
-                    "lab",
-                    "wyklad",
-                    "cwiczenia",
-                    "masz w ",
-                    " od ",
-                    " do ",
-                )
-            )
+                if (
+                    previous_user
+                    and _looks_like_calendar_question(
+                        previous_user
+                    )
+                ):
+                    looks_like_question = True
+                    break
 
     if not looks_like_question:
         return None
