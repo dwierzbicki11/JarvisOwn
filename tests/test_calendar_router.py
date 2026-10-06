@@ -119,6 +119,21 @@ class CalendarRouterTests(unittest.TestCase):
             answer,
         )
 
+    def test_tomorrow_yes_no_subject_query_stays_local(self):
+        answer = self.answer(
+            "Czy jutro mam techniki pomiarowe dla informatyków?"
+        )
+
+        self.assertIsNotNone(answer)
+        self.assertIn(
+            "Techniki pomiarowe dla informatyków",
+            answer,
+        )
+        self.assertNotIn(
+            "nie mam dostępu",
+            answer.lower(),
+        )
+
     def test_transport_question_is_not_stolen_by_calendar(self):
         answer = self.answer(
             "Kiedy mam autobus?"
