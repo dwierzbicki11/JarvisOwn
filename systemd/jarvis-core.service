@@ -7,9 +7,15 @@ Wants=network-online.target pipewire.service wireplumber.service
 [Service]
 StartLimitIntervalSec=0
 Type=simple
+Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=%t
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=%t/bus
 WorkingDirectory=/home/zonderq/jarvis
+ExecStartPre=/usr/bin/mkdir -p /home/zonderq/jarvis/runtime
 ExecStartPre=/home/zonderq/jarvis/wait-audio.sh
 ExecStart=/home/zonderq/jarvis/.venv/bin/python /home/zonderq/jarvis/main.py
+StandardOutput=append:/home/zonderq/jarvis/runtime/jarvis-core.log
+StandardError=append:/home/zonderq/jarvis/runtime/jarvis-core.log
 Restart=always
 RestartSec=5
 Nice=5
