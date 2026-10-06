@@ -114,6 +114,12 @@ WAKE_COMMAND_GRACE_SECONDS = float(
         "1.6",
     )
 )
+ACTIVE_LISTEN_TIMEOUT = float(
+    os.getenv(
+        "ACTIVE_LISTEN_TIMEOUT",
+        "8",
+    )
+)
 
 GUI_STATE_FILE = BASE_DIR / "runtime" / "state.json"
 GUI_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -2074,17 +2080,18 @@ def main():
                 text = pending_command
                 pending_command = None
             else:
-                text = listen_command()
+                text = listen_command(
+                    wait_seconds=ACTIVE_LISTEN_TIMEOUT
+                )
 
             if not text:
-                if (
-                    time.monotonic()
-                    > active_until
-                ):
-                    set_gui_state(
-                        "standby"
-                    )
-
+                # Jedno puste okno nasłuchu kończy aktywną sesję.
+                # Wcześniej JARVIS uruchamiał kolejne 12-sekundowe
+                # VAD-y aż do końca SESSION_SECONDS.
+                active_until = 0.0
+                set_gui_state(
+                    "standby"
+                )
                 continue
 
             last_interaction = (
