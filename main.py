@@ -20,6 +20,7 @@ from skills.conversation_history import (
     clear_history,
     format_recent_history,
     recent_messages,
+    recent_turns,
 )
 from skills.audio_manager import (
     playback_target,
@@ -34,7 +35,12 @@ from skills.memory_store import (
     recent_memories,
     remember,
 )
-from skills.pk_calendar import get_first_class, get_next_class, get_schedule, find_subject_schedule
+from skills.pk_calendar import (
+    answer_calendar_question,
+    get_first_class,
+    get_next_class,
+    get_schedule,
+)
 from skills.reminders import (
     add_reminder,
     cancel_latest,
@@ -1341,70 +1347,18 @@ def process_command(text):
             day_offset=1
         )
 
-    # Pytania o konkretny przedmiot w planie.
-    subject_patterns = (
-        r"kiedy mam przedmiot[?.,:\s]*(.+)",
-        r"kiedy mam zajęcia z[?.,:\s]*(.+)",
-        r"kiedy mam zajecia z[?.,:\s]*(.+)",
-        r"kiedy mam[?.,:\s]*(.+)",
-        r"kiedy jest[?.,:\s]*(.+)",
-        r"o której mam[?.,:\s]*(.+)",
-        r"o ktorej mam[?.,:\s]*(.+)",
+    # Prywatny plan zajęć ma pierwszeństwo przed ogólnym LLM.
+    # Router porównuje naturalne pytanie z realnymi wydarzeniami ICS,
+    # więc obsługuje m.in. "kiedy będę miał ... w laboratorium?".
+    calendar_answer = answer_calendar_question(
+        text,
+        context_turns=recent_turns(
+            limit=3
+        ),
     )
 
-    calendar_words = (
-        "przedmiot",
-        "zajęcia",
-        "zajecia",
-        "kiedy mam",
-        "kiedy jest",
-        "o której mam",
-        "o ktorej mam",
-    )
-
-    if any(word in lower for word in calendar_words):
-        for pattern in subject_patterns:
-            match = re.search(
-                pattern,
-                text,
-                flags=re.IGNORECASE,
-            )
-
-            if not match:
-                continue
-
-            subject = (
-                match.group(1)
-                .strip()
-                .strip(" ?.!,")
-            )
-
-            # Nie przechwytuj ogólnych pytań typu
-            # "kiedy mam autobus".
-            blocked = (
-                "autobus",
-                "wyjść",
-                "wyjsc",
-                "dojechać",
-                "dojechac",
-            )
-
-            if (
-                subject
-                and not any(
-                    word in subject.lower()
-                    for word in blocked
-                )
-            ):
-                print(
-                    f"🎯 INTENT subject_schedule: "
-                    f"{subject}",
-                    flush=True,
-                )
-
-                return find_subject_schedule(
-                    subject
-                )
+    if calendar_answer:
+        return calendar_answer
 
     # Odporny router komend głosowych.
     # Whisper może np. zgubić polski znak albo lekko przekręcić frazę.
