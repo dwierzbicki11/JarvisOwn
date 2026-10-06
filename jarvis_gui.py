@@ -19,6 +19,7 @@ from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
 from skills.proactive import proactive_status
 from skills.reminders import pending_reminders
+from skills.scheduled_briefing import briefing_status
 from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
 from skills.tasks import pending_tasks
@@ -454,6 +455,11 @@ def status():
             "focus",
             2,
             current_focus,
+        ),
+        "briefing": cached(
+            "briefing",
+            30,
+            briefing_status,
         ),
         "system": system_data(),
         "network": cached(
