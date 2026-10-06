@@ -353,7 +353,19 @@ def _looks_like_calendar_question(text):
         "kiedy mam ",
         "kiedy bede mial ",
         "kiedy bede miec ",
+        "kiedy bedzie ",
         "kiedy jest ",
+        "czy mam ",
+        "czy bede mial ",
+        "czy bede miec ",
+        "gdzie mam ",
+        "gdzie bede mial ",
+        "gdzie bede miec ",
+        "w jakiej sali mam ",
+        "w jakiej sali bede mial ",
+        "w jakiej sali bede miec ",
+        "w jaki dzien mam ",
+        "w jaki dzien bede mial ",
         "o ktorej mam ",
         "o ktorej bede mial ",
         "ktorego dnia mam ",
@@ -527,10 +539,71 @@ def answer_calendar_question(
 
     Dzięki temu pytania o prywatny plan nie trafiają do ogólnego LLM.
     """
-    if not _looks_like_calendar_question(text):
-        return None
-
     normalized = _normalize_calendar_text(text)
+
+    looks_like_question = _looks_like_calendar_question(
+        text
+    )
+
+    # Krótkie odwołanie do poprzedniej odpowiedzi, np.
+    # "A laboratorium?", "A o której?", "A w jakiej sali?".
+    if (
+        not looks_like_question
+        and context_turns
+    ):
+        followup_markers = (
+            "lab",
+            "wyklad",
+            "cwiczenia",
+            "projekt",
+            "seminarium",
+            "kiedy",
+            "o ktorej",
+            "gdzie",
+            "w jakiej sali",
+            "ktorego dnia",
+        )
+
+        short_followup = (
+            len(normalized.split()) <= 7
+            and (
+                normalized.startswith("a ")
+                or any(
+                    marker in normalized
+                    for marker in followup_markers
+                )
+            )
+        )
+
+        if short_followup:
+            previous = " ".join(
+                (
+                    str(turn.get("user", ""))
+                    + " "
+                    + str(turn.get("assistant", ""))
+                )
+                for turn in context_turns[-3:]
+            )
+
+            previous_norm = _normalize_calendar_text(
+                previous
+            )
+
+            looks_like_question = any(
+                marker in previous_norm
+                for marker in (
+                    "zajecia",
+                    "lab",
+                    "wyklad",
+                    "cwiczenia",
+                    "masz w ",
+                    " od ",
+                    " do ",
+                )
+            )
+
+    if not looks_like_question:
+        return None
 
     # Nie przechwytuj domen obsługiwanych przez inne lokalne moduły.
     blocked = (
