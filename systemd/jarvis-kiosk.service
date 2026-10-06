@@ -1,0 +1,18 @@
+[Unit]
+PartOf=jarvis.target
+Description=JARVIS Dashboard Kiosk
+Requires=jarvis-web.service
+After=jarvis-web.service graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+Environment=JARVIS_KIOSK_URL=http://127.0.0.1:8765
+WorkingDirectory=/home/zonderq/jarvis
+ExecStart=/home/zonderq/jarvis/tools/launch_kiosk.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
