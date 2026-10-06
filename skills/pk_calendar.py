@@ -269,7 +269,8 @@ _CALENDAR_STOPWORDS = {
     "przedmiot", "przedmiotu", "sie", "ten", "tego", "to", "w",
     "we", "z", "za", "zajecia", "bede", "bedziemy", "najblizsze",
     "najblizszy", "nastepne", "nastepny", "dniu", "dzien",
-    "godzinie", "godzina", "jutro", "dzisiaj", "dzis",
+    "dnia", "godzinie", "godzina", "jutro", "dzisiaj", "dzis",
+    "gdzie", "jakiej", "ktorej", "sala", "sali",
 }
 
 
