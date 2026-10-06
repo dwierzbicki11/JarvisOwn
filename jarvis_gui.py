@@ -380,6 +380,16 @@ def warm_status_cache():
         default=[],
     )
     cached(
+        "focus",
+        2,
+        current_focus,
+    )
+    cached(
+        "briefing",
+        30,
+        briefing_status,
+    )
+    cached(
         "network",
         5,
         wifi_status,
