@@ -4,6 +4,7 @@ import threading
 import time
 
 from skills.proactive import class_notification_due, headphone_battery_notification_due
+from skills.focus import pop_due_focus_notice
 from skills.reminders import has_due_reminders, pop_due_reminders
 from skills.tasks import pop_due_task_notices
 from skills.web_commands import has_pending_commands, pop_pending_commands
@@ -48,6 +49,16 @@ TASK_NOTICE_HORIZON_MINUTES = max(
     ),
 )
 
+FOCUS_CHECK_SECONDS = max(
+    5,
+    int(
+        os.getenv(
+            "FOCUS_CHECK_SECONDS",
+            "10",
+        )
+    ),
+)
+
 
 class BackgroundEvents:
     def __init__(self):
@@ -57,6 +68,7 @@ class BackgroundEvents:
         self._last_class_check = 0.0
         self._last_battery_check = 0.0
         self._last_task_check = 0.0
+        self._last_focus_check = 0.0
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -200,6 +212,31 @@ class BackgroundEvents:
                 except Exception as exc:
                     print(
                         f"[BACKGROUND TASK ERROR] {exc}",
+                        flush=True,
+                    )
+
+            if now - self._last_focus_check >= FOCUS_CHECK_SECONDS:
+                self._last_focus_check = now
+
+                try:
+                    session = pop_due_focus_notice()
+
+                    if session:
+                        self.queue.put(
+                            {
+                                "type": "focus",
+                                "text": (
+                                    "Sesja "
+                                    + session["label"]
+                                    + " zakończona. "
+                                    "Możesz zrobić krótką przerwę."
+                                ),
+                            }
+                        )
+
+                except Exception as exc:
+                    print(
+                        f"[BACKGROUND FOCUS ERROR] {exc}",
                         flush=True,
                     )
 
