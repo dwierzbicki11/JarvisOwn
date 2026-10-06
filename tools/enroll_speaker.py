@@ -28,17 +28,20 @@ SAMPLES = max(
     int(
         os.getenv(
             "SPEAKER_ENROLL_SAMPLES",
-            "5",
+            "8",
         )
     ),
 )
 
 PHRASES = (
-    "Jarvis, jaka będzie jutro pogoda?",
+    "Hej Jarvis, jaka będzie jutro pogoda?",
     "Jarvis, kiedy mam następne zajęcia?",
-    "Jarvis, przypomnij mi o nauce.",
-    "Jarvis, sprawdź status serwera.",
-    "Jarvis, pomóż mi z matematyką.",
+    "Ej Jarvis, przypomnij mi o nauce.",
+    "Słuchaj Jarvis, sprawdź status serwera.",
+    "Dobra Jarvis, pomóż mi z matematyką.",
+    "Jarvis, co mam jutro na uczelni?",
+    "Hej Jarvis, sprawdź odjazdy autobusów.",
+    "Jarvis, powiedz mi coś o moich notatkach.",
 )
 
 
