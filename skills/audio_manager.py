@@ -185,12 +185,9 @@ def source_id():
     )
 
 
-def _profile_index(dev_id, profile_name):
+def _enum_profiles(dev_id):
     """
-    Zwraca indeks profilu PipeWire z EnumProfile.
-
-    Nie dzielimy outputu po "Object:", bo ten tekst występuje też
-    wewnątrz nazw pól Spa:Pod:Object:Param:* i rozcinał poprzedni parser.
+    Czyta dostępne profile PipeWire i zwraca słownik po indeksie.
     """
     result = _run(
         [
@@ -203,19 +200,40 @@ def _profile_index(dev_id, profile_name):
     )
 
     if result.returncode != 0:
-        return None
+        return {}
 
     pattern = re.compile(
         r"Profile:index.*?\n\s+Int\s+(\d+)"
-        r".*?Profile:name.*?\n\s+String\s+\"([^\"]+)\"",
+        r".*?Profile:name.*?\n\s+String\s+\"([^\"]+)\""
+        r".*?Profile:description.*?\n\s+String\s+\"([^\"]+)\"",
         flags=re.DOTALL,
     )
 
+    profiles = {}
+
     for match in pattern.finditer(result.stdout):
         index = int(match.group(1))
-        name = match.group(2)
+        description = match.group(3)
 
-        if name == profile_name:
+        profiles[index] = {
+            "index": index,
+            "name": match.group(2),
+            "description": description,
+            "msbc": "msbc" in description.lower(),
+        }
+
+    return profiles
+
+
+def _profile_index(dev_id, profile_name):
+    """
+    Zwraca indeks profilu PipeWire z EnumProfile.
+
+    Poprzedni parser dzielił tekst po "Object:", ale ta fraza
+    występuje też w nazwach pól Spa:Pod:Object:Param:*.
+    """
+    for index, profile in _enum_profiles(dev_id).items():
+        if profile["name"] == profile_name:
             return index
 
     return None
@@ -223,7 +241,7 @@ def _profile_index(dev_id, profile_name):
 
 def active_profile(dev_id):
     """
-    Zwraca informacje o faktycznie aktywnym profilu urządzenia.
+    Zwraca faktycznie aktywny profil, łącząc bieżący indeks z EnumProfile.
     """
     result = _run(
         [
@@ -243,37 +261,22 @@ def active_profile(dev_id):
         result.stdout,
         flags=re.DOTALL,
     )
-    name_match = re.search(
-        r"Profile:name.*?\n\s+String\s+\"([^\"]+)\"",
-        result.stdout,
-        flags=re.DOTALL,
-    )
-    desc_match = re.search(
-        r"Profile:description.*?\n\s+String\s+\"([^\"]+)\"",
-        result.stdout,
-        flags=re.DOTALL,
-    )
 
-    if not name_match:
+    if not index_match:
         return None
 
-    description = (
-        desc_match.group(1)
-        if desc_match
-        else name_match.group(1)
-    )
+    index = int(index_match.group(1))
+    profiles = _enum_profiles(dev_id)
+
+    if index in profiles:
+        return profiles[index]
 
     return {
-        "index": (
-            int(index_match.group(1))
-            if index_match
-            else None
-        ),
-        "name": name_match.group(1),
-        "description": description,
-        "msbc": "msbc" in description.lower(),
+        "index": index,
+        "name": f"profile-{index}",
+        "description": f"aktywny profil {index}",
+        "msbc": False,
     }
-
 
 def force_msbc():
     if not BT_FORCE_MSBC:
