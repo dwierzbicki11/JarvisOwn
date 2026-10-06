@@ -268,7 +268,8 @@ _CALENDAR_STOPWORDS = {
     "mial", "miala", "mieli", "miec", "na", "o", "od", "po",
     "przedmiot", "przedmiotu", "sie", "ten", "tego", "to", "w",
     "we", "z", "za", "zajecia", "bede", "bedziemy", "najblizsze",
-    "najblizszy", "dniu", "dzien", "godzinie", "godzina",
+    "najblizszy", "nastepne", "nastepny", "dniu", "dzien",
+    "godzinie", "godzina", "jutro", "dzisiaj", "dzis",
 }
 
 
@@ -373,6 +374,30 @@ def _looks_like_calendar_question(text):
     )
 
     if normalized.startswith(direct_starts):
+        return True
+
+    # Naturalne warianty z wtrąceniem dnia/okresu:
+    # "Czy jutro mam analizę?", "Czy w środę będę miał lab?".
+    padded = f" {normalized} "
+
+    if (
+        normalized.startswith("czy ")
+        and (
+            " mam " in padded
+            or " bede mial " in padded
+            or " bede miec " in padded
+        )
+    ):
+        return True
+
+    if (
+        normalized.startswith("za ile ")
+        and (
+            " mam " in padded
+            or " bede mial " in padded
+            or " bede miec " in padded
+        )
+    ):
         return True
 
     academic_words = (
