@@ -20,6 +20,7 @@ from skills.proactive import proactive_status
 from skills.reminders import pending_reminders
 from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
+from skills.tasks import pending_tasks
 from skills.web_commands import submit_command
 
 BASE_DIR = Path.home() / "jarvis"
@@ -321,6 +322,30 @@ def pihole_data():
     )
 
 
+def task_data():
+    items = pending_tasks(
+        limit=6
+    )
+
+    return [
+        {
+            "id": item["id"],
+            "text": item["text"],
+            "due": (
+                item["due_at"].strftime(
+                    "%d.%m %H:%M"
+                )
+                if item["due_at"]
+                else None
+            ),
+            "priority": item[
+                "priority"
+            ],
+        }
+        for item in items
+    ]
+
+
 def reminder_data():
     items = pending_reminders(
         limit=5
@@ -418,6 +443,11 @@ def status():
             "reminders",
             5,
             reminder_data,
+        ),
+        "tasks": cached(
+            "tasks",
+            5,
+            task_data,
         ),
         "system": system_data(),
         "network": cached(
