@@ -118,6 +118,18 @@ body[data-state="sleeping"] .state{opacity:.22}
       </div>
 
       <div class="normal" id="temperature">CPU temp: --</div>
+
+      <div class="metric" style="margin-top:1.2vh">
+        <div class="metric-head">
+          <span>SŁUCHAWKI</span>
+          <span id="headphones-battery-value">--</span>
+        </div>
+        <div class="bar">
+          <div id="headphones-battery-bar" class="fill"></div>
+        </div>
+      </div>
+      <div class="small" id="headphones-status">Bluetooth: --</div>
+
       <br>
       <div class="normal" id="services">Pi-hole: --</div><br><div class="small" id="network-health">Sieć: --</div><div class="small" id="raid-health">RAID: --</div>
     </div>
@@ -248,6 +260,27 @@ async function update(){
     setBar("disk-bar",system.disk);
     document.getElementById("temperature").textContent=
       `CPU temp: ${system.temp??"--"}°C`;
+
+    const headphones=data.headphones||{};
+    const headphonesValue=document.getElementById("headphones-battery-value");
+    const headphonesStatus=document.getElementById("headphones-status");
+
+    if(!headphones.connected){
+      headphonesValue.textContent="OFF";
+      setBar("headphones-battery-bar",0);
+      headphonesStatus.textContent=
+        `${headphones.name||"Słuchawki"}: rozłączone`;
+    }else if(headphones.available && headphones.percentage!==null){
+      headphonesValue.textContent=`${headphones.percentage}%`;
+      setBar("headphones-battery-bar",headphones.percentage);
+      headphonesStatus.textContent=
+        `${headphones.name||"Słuchawki"} • bateria z BlueZ`;
+    }else{
+      headphonesValue.textContent="--";
+      setBar("headphones-battery-bar",0);
+      headphonesStatus.textContent=
+        `${headphones.name||"Słuchawki"}: bateria niedostępna`;
+    }
 
     const services=data.services||{pihole:false,docker:{running:0}};
     document.getElementById("services").innerHTML=
