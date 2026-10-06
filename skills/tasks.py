@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -194,6 +195,129 @@ def delete_latest():
     return row[1]
 
 
+WEEKDAY_ALIASES = {
+    0: (
+        "poniedzialek",
+        "poniedzialku",
+    ),
+    1: (
+        "wtorek",
+        "wtorku",
+    ),
+    2: (
+        "sroda",
+        "srode",
+        "srody",
+    ),
+    3: (
+        "czwartek",
+        "czwartku",
+    ),
+    4: (
+        "piatek",
+        "piatku",
+    ),
+    5: (
+        "sobota",
+        "sobote",
+        "soboty",
+    ),
+    6: (
+        "niedziela",
+        "niedziele",
+        "niedzieli",
+    ),
+}
+
+
+def _normalize_words(text):
+    value = unicodedata.normalize(
+        "NFKD",
+        (text or "").lower(),
+    )
+
+    value = "".join(
+        char
+        for char in value
+        if not unicodedata.combining(
+            char
+        )
+    )
+
+    value = value.translate(
+        str.maketrans(
+            {
+                "ł": "l",
+                "Ł": "L",
+            }
+        )
+    )
+
+    return re.sub(
+        r"\s+",
+        " ",
+        value,
+    ).strip()
+
+
+def _requested_weekday(text):
+    normalized = _normalize_words(
+        text
+    )
+
+    words = set(
+        re.findall(
+            r"[a-z]+",
+            normalized,
+        )
+    )
+
+    for weekday, aliases in WEEKDAY_ALIASES.items():
+        if any(
+            alias in words
+            for alias in aliases
+        ):
+            return weekday
+
+    return None
+
+
+def _weekday_date(
+    now,
+    weekday,
+    *,
+    hour,
+    minute,
+):
+    days = (
+        weekday
+        - now.weekday()
+    ) % 7
+
+    target = (
+        now.date()
+        + timedelta(
+            days=days
+        )
+    )
+
+    candidate = datetime(
+        target.year,
+        target.month,
+        target.day,
+        hour,
+        minute,
+        tzinfo=TIMEZONE,
+    )
+
+    if candidate <= now:
+        candidate += timedelta(
+            days=7
+        )
+
+    return candidate
+
+
 def _parse_time(
     raw,
 ):
@@ -270,6 +394,13 @@ def parse_task_command(
     day_offset = None
 
     if re.search(
+        r"\bpojutrze\b",
+        body,
+        flags=re.IGNORECASE,
+    ):
+        day_offset = 2
+
+    elif re.search(
         r"\bjutro\b",
         body,
         flags=re.IGNORECASE,
@@ -283,31 +414,28 @@ def parse_task_command(
     ):
         day_offset = 0
 
+    weekday = _requested_weekday(
+        body
+    )
+
     time_value = _parse_time(
         body
     )
 
-    if (
-        day_offset is not None
-        or time_value is not None
-    ):
+    hour, minute = (
+        time_value
+        if time_value is not None
+        else (
+            20,
+            0,
+        )
+    )
+
+    if day_offset is not None:
         target_date = (
             now.date()
             + timedelta(
-                days=(
-                    day_offset
-                    if day_offset is not None
-                    else 0
-                )
-            )
-        )
-
-        hour, minute = (
-            time_value
-            if time_value is not None
-            else (
-                20,
-                0,
+                days=day_offset
             )
         )
 
@@ -320,15 +448,36 @@ def parse_task_command(
             tzinfo=TIMEZONE,
         )
 
-        if (
-            day_offset is None
-            and due_at <= now
-        ):
+    elif weekday is not None:
+        due_at = _weekday_date(
+            now,
+            weekday,
+            hour=hour,
+            minute=minute,
+        )
+
+    elif time_value is not None:
+        due_at = datetime(
+            now.year,
+            now.month,
+            now.day,
+            hour,
+            minute,
+            tzinfo=TIMEZONE,
+        )
+
+        if due_at <= now:
             due_at += timedelta(
                 days=1
             )
 
     # Usuń fragment czasu z treści samego zadania.
+    body = re.sub(
+        r"\b(?:na\s+)?pojutrze\b",
+        " ",
+        body,
+        flags=re.IGNORECASE,
+    )
     body = re.sub(
         r"\b(?:na\s+)?jutro\b",
         " ",
@@ -337,6 +486,18 @@ def parse_task_command(
     )
     body = re.sub(
         r"\b(?:na\s+)?dzis(?:iaj)?\b",
+        " ",
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        (
+            r"\b(?:w|we|na)\s+"
+            r"(?:poniedziałek|poniedzialek|poniedziałku|poniedzialku|"
+            r"wtorek|wtorku|środę|srode|środa|sroda|"
+            r"czwartek|czwartku|piątek|piatek|piątku|piatku|"
+            r"sobotę|sobote|sobota|niedzielę|niedziele|niedziela)\b"
+        ),
         " ",
         body,
         flags=re.IGNORECASE,
