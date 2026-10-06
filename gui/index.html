@@ -89,6 +89,7 @@ body[data-state="sleeping"] .state{opacity:.22}
     <div class="jarvis-name">JARVIS</div>
     <div class="state" id="jarvis-state">CZUWANIE</div>
     <div class="mode" id="jarvis-mode">TRYB: STANDARD</div>
+    <div class="mode" id="speaker-state">GŁOS: --</div>
     <div class="mode" id="latency">LATENCY: --</div>
   </div>
 
@@ -222,6 +223,23 @@ async function update(){
     let mode=data.jarvis.study_mode?`NAUKA: ${data.jarvis.study_mode.toUpperCase()}`:"STANDARD";
     if(data.jarvis.exam_mode){mode+=" + EGZAMIN";}
     document.getElementById("jarvis-mode").textContent=`TRYB: ${mode}`;
+
+    const speaker=data.jarvis.speaker||{};
+    const speakerElement=document.getElementById("speaker-state");
+
+    if(!speaker.enabled){
+      speakerElement.textContent="GŁOS: WERYFIKACJA OFF";
+    }else if(!speaker.enrolled){
+      speakerElement.textContent="GŁOS: BRAK PROFILU";
+    }else if(speaker.similarity!==null && speaker.similarity!==undefined){
+      const percent=Math.round(speaker.similarity*100);
+      const threshold=Math.round((speaker.threshold||0)*100);
+      speakerElement.textContent=
+        `GŁOS: ${speaker.accepted?"TWÓJ":"ODRZUCONY"} ${percent}% / próg ${threshold}%`;
+    }else{
+      speakerElement.textContent="GŁOS: WERYFIKACJA AKTYWNA";
+    }
+
     document.getElementById("latency").textContent=`LATENCY: ${renderLatency(data.jarvis.last_latency)}`;
 
     if(data.weather){
