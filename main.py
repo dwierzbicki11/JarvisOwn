@@ -1768,17 +1768,33 @@ def process_command(text):
     )
 
     if (
-        "jutro" in lower
-        and any(word in lower for word in commute_words)
-        and any(word in lower for word in commute_destinations)
+        any(
+            word in lower
+            for word in commute_words
+        )
+        and any(
+            word in lower
+            for word in commute_destinations
+        )
     ):
+        day_offset = (
+            1
+            if "jutro" in lower
+            else 0
+        )
+
         print(
-            "🎯 INTENT commute_tomorrow",
+            "🎯 INTENT "
+            + (
+                "commute_tomorrow"
+                if day_offset == 1
+                else "commute_today"
+            ),
             flush=True,
         )
 
         return trip_to_first_class(
-            day_offset=1
+            day_offset=day_offset
         )
 
     # Prywatny plan zajęć ma pierwszeństwo przed ogólnym LLM.
