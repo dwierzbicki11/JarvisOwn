@@ -94,18 +94,19 @@ echo
 echo "5/7 Aktualizacja usług systemd..."
 mkdir -p "$USER_SYSTEMD_DIR"
 
-for unit in     jarvis-core.service     jarvis-web.service     jarvis.target
+for unit in     jarvis-core.service     jarvis-web.service     jarvis-kiosk.service     jarvis.target
 do
     install -m 0644         "$SOURCE_DIR/systemd/$unit"         "$USER_SYSTEMD_DIR/$unit"
 done
 
 chmod +x "$RUNTIME_DIR/wait-audio.sh"
+chmod +x "$RUNTIME_DIR/tools/launch_kiosk.sh"
 systemctl --user daemon-reload
 
 echo
 echo "6/7 Włączanie autostartu po bootowaniu..."
 
-systemctl --user enable     jarvis.target     jarvis-core.service     jarvis-web.service     >/dev/null
+systemctl --user enable     jarvis.target     jarvis-core.service     jarvis-web.service     jarvis-kiosk.service     >/dev/null
 
 if command -v loginctl >/dev/null 2>&1; then
     linger="$(
@@ -164,12 +165,22 @@ enabled_web="$(
     systemctl --user is-enabled jarvis-web.service 2>/dev/null     || true
 )"
 
+enabled_kiosk="$(
+    systemctl --user is-enabled jarvis-kiosk.service 2>/dev/null     || true
+)"
+
+kiosk_state="$(
+    systemctl --user is-active jarvis-kiosk.service 2>/dev/null     || true
+)"
+
 echo
 echo "Autostart target: $enabled_target"
 echo "Autostart core:   $enabled_core"
 echo "Autostart web:    $enabled_web"
+echo "Autostart kiosk:  $enabled_kiosk"
 echo "Core:             $core_state"
 echo "Web:              $web_state"
+echo "Kiosk:            $kiosk_state"
 
 if [[ "$enabled_target" != "enabled" ]]; then
     echo
@@ -189,6 +200,11 @@ if [[ "$enabled_web" != "enabled" ]]; then
     exit 5
 fi
 
+if [[ "$enabled_kiosk" != "enabled" ]]; then
+    echo
+    echo "UWAGA: jarvis-kiosk.service nie jest włączony do autostartu."
+fi
+
 if [[ "$core_state" != "active" ]]; then
     echo
     echo "BŁĄD: jarvis-core.service nie działa."
@@ -201,6 +217,13 @@ if [[ "$web_state" != "active" ]]; then
     echo "BŁĄD: jarvis-web.service nie działa."
     journalctl --user         -u jarvis-web.service         -n 40         --no-pager || true
     exit 3
+fi
+
+if [[ "$kiosk_state" != "active" ]]; then
+    echo
+    echo "UWAGA: kiosk nie jest jeszcze aktywny."
+    echo "Jeśli pulpit graficzny dopiero startuje, usługa ponowi próbę automatycznie."
+    echo "Sprawdź: systemctl --user status jarvis-kiosk.service --no-pager"
 fi
 
 if command -v curl >/dev/null 2>&1; then
