@@ -45,6 +45,61 @@ class TaskTests(unittest.TestCase):
         self.assertTrue(parsed["priority"])
         self.assertEqual(parsed["text"], "wysłać projekt")
 
+    def test_parse_weekday_task(self):
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie w piątek o 18:30 wysłać projekt"
+        )
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(
+            parsed["text"],
+            "wysłać projekt",
+        )
+        self.assertIsNotNone(
+            parsed["due_at"]
+        )
+        self.assertEqual(
+            parsed["due_at"].weekday(),
+            4,
+        )
+        self.assertEqual(
+            parsed["due_at"].hour,
+            18,
+        )
+        self.assertGreater(
+            parsed["due_at"],
+            datetime.now(
+                tasks.TIMEZONE
+            ),
+        )
+
+    def test_parse_day_after_tomorrow_task(self):
+        before = datetime.now(
+            tasks.TIMEZONE
+        )
+
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie pojutrze o 12:00 oddać raport"
+        )
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(
+            parsed["text"],
+            "oddać raport",
+        )
+
+        expected = (
+            before.date()
+            + tasks.timedelta(
+                days=2
+            )
+        )
+
+        self.assertEqual(
+            parsed["due_at"].date(),
+            expected,
+        )
+
     def test_due_notice_only_once(self):
         due = datetime.now(tasks.TIMEZONE)
         tasks.add_task("wysłać raport", due_at=due, priority=True)
