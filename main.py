@@ -64,6 +64,11 @@ from skills.study_materials import (
     material_for_prompt,
     search_materials,
 )
+from skills.study_rag import (
+    build_context,
+    index_status as study_index_status,
+    rebuild_index as rebuild_study_index,
+)
 from skills.system_health import short_health_text
 from skills.weather import get_weather
 from skills.voice_router import classify_voice_intent
@@ -1053,6 +1058,65 @@ def llm_answer(text):
 
 
 
+def answer_from_study_rag(
+    text,
+    *,
+    quiz=False,
+):
+    """
+    Odpowiada na podstawie lokalnych materiałów użytkownika.
+
+    Do modelu wysyłamy tylko najbardziej trafne fragmenty,
+    a nie cały katalog materiałów.
+    """
+    try:
+        context, sources = build_context(
+            text,
+            limit=6,
+            max_chars=10000,
+        )
+    except Exception as exc:
+        return (
+            "Nie mogę teraz przeszukać materiałów. "
+            f"{exc}"
+        )
+
+    if not context:
+        return (
+            "Nie znalazłem w twoich materiałach "
+            "fragmentów pasujących do tego pytania."
+        )
+
+    if quiz:
+        instruction = (
+            "Przepytuj użytkownika WYŁĄCZNIE na podstawie "
+            "poniższych fragmentów jego materiałów. "
+            "Zadaj jedno konkretne pytanie i nie podawaj "
+            "odpowiedzi, dopóki użytkownik sam nie odpowie."
+        )
+    else:
+        instruction = (
+            "Odpowiedz WYŁĄCZNIE na podstawie poniższych "
+            "fragmentów materiałów użytkownika. "
+            "Jeśli fragmenty nie wystarczają do odpowiedzi, "
+            "powiedz to wprost zamiast uzupełniać wiedzą ogólną. "
+            "Na końcu krótko podaj nazwy wykorzystanych źródeł."
+        )
+
+    source_text = ", ".join(
+        sources
+    )
+
+    prompt = (
+        f"{instruction}\n\n"
+        f"Pytanie użytkownika:\n{text}\n\n"
+        f"Materiały:\n{context}\n\n"
+        f"Dostępne źródła: {source_text}"
+    )
+
+    return llm_answer(prompt)
+
+
 def answer_from_study_material(text, quiz=False):
     lower = normalize_text(text)
 
@@ -1628,6 +1692,104 @@ def process_command(text):
 
         return get_schedule(
             day_offset=0
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "odśwież indeks materiałów",
+            "odswiez indeks materialow",
+            "przebuduj indeks materiałów",
+            "przebuduj indeks materialow",
+        )
+    ):
+        result = rebuild_study_index(
+            force=True
+        )
+
+        if result["failed"]:
+            return (
+                "Odświeżyłem indeks materiałów, "
+                f"ale {len(result['failed'])} plików "
+                "nie udało się przetworzyć."
+            )
+
+        return (
+            "Odświeżyłem indeks materiałów. "
+            f"Pliki: {result['files']}, "
+            f"przeindeksowane: {result['indexed']}."
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "status indeksu materiałów",
+            "status indeksu materialow",
+            "ile mam materiałów w indeksie",
+            "ile mam materialow w indeksie",
+        )
+    ):
+        status = study_index_status()
+
+        if status.get("error"):
+            return (
+                "Indeks materiałów zgłasza błąd: "
+                + status["error"]
+            )
+
+        return (
+            "Indeks materiałów zawiera "
+            f"{status['files']} plików i "
+            f"{status['chunks']} fragmentów."
+        )
+
+    rag_markers = (
+        "na podstawie moich materiałów",
+        "na podstawie moich materialow",
+        "w moich materiałach",
+        "w moich materialach",
+        "z moich materiałów",
+        "z moich materialow",
+        "w moich notatkach",
+        "z moich notatek",
+        "sprawdź w materiałach",
+        "sprawdz w materialach",
+        "wyszukaj w materiałach",
+        "wyszukaj w materialach",
+        "co moje materiały mówią",
+        "co moje materialy mowia",
+    )
+
+    if any(
+        marker in lower
+        for marker in rag_markers
+    ):
+        print(
+            "🎯 INTENT study_rag",
+            flush=True,
+        )
+
+        return answer_from_study_rag(
+            text
+        )
+
+    if any(
+        marker in lower
+        for marker in (
+            "przepytaj mnie z moich materiałów",
+            "przepytaj mnie z moich materialow",
+            "zrób quiz z moich materiałów",
+            "zrob quiz z moich materialow",
+        )
+    ):
+        print(
+            "🎯 INTENT study_rag_quiz",
+            flush=True,
+        )
+
+        return answer_from_study_rag(
+            text,
+            quiz=True,
         )
 
     if (
