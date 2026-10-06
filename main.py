@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 import wave
 from datetime import datetime, timedelta
@@ -119,6 +120,31 @@ ACTIVE_LISTEN_TIMEOUT = float(
     os.getenv(
         "ACTIVE_LISTEN_TIMEOUT",
         "8",
+    )
+)
+BARGE_IN_ENABLED = os.getenv(
+    "BARGE_IN_ENABLED",
+    "1",
+) == "1"
+BARGE_IN_WAKE_THRESHOLD = float(
+    os.getenv(
+        "BARGE_IN_WAKE_THRESHOLD",
+        "0.65",
+    )
+)
+BARGE_IN_REQUIRED_HITS = max(
+    1,
+    int(
+        os.getenv(
+            "BARGE_IN_REQUIRED_HITS",
+            "2",
+        )
+    ),
+)
+BARGE_IN_START_DELAY = float(
+    os.getenv(
+        "BARGE_IN_START_DELAY",
+        "0.35",
     )
 )
 
@@ -388,6 +414,43 @@ def normalize_for_speech(text: str) -> str:
     return re.sub(r"\s+", " ", spoken).strip()
 
 
+def _barge_in_watch(
+    stop_event,
+    wake_event,
+):
+    """
+    Nasłuchuje lokalnego wake-word podczas odtwarzania TTS.
+
+    To nie wysyła audio do chmury. Wyższy próg niż w standby
+    ogranicza przypadkowe przerwania od dźwięków w pokoju.
+    """
+    if BARGE_IN_START_DELAY > 0:
+        stop_event.wait(
+            BARGE_IN_START_DELAY
+        )
+
+    if stop_event.is_set():
+        return
+
+    try:
+        reason = wait_for_jarvis(
+            timeout=None,
+            stop_event=stop_event,
+            threshold=BARGE_IN_WAKE_THRESHOLD,
+            required_hits=BARGE_IN_REQUIRED_HITS,
+            announce=False,
+        )
+
+        if reason == "wake":
+            wake_event.set()
+
+    except Exception as exc:
+        print(
+            f"[BARGE-IN ERROR] {exc}",
+            flush=True,
+        )
+
+
 def speak(text: str):
     print(f"\nJARVIS: {text}\n", flush=True)
     set_gui_state(
@@ -445,22 +508,97 @@ def speak(text: str):
                 wav_path,
             ]
 
-        result = subprocess.run(
+        stop_event = threading.Event()
+        wake_event = threading.Event()
+        watcher = None
+
+        # Gdy sam TTS wypowiada słowo "Jarvis", nie uruchamiaj
+        # detektora barge-in, bo echo mogłoby przerwać własną odpowiedź.
+        can_barge_in = (
+            BARGE_IN_ENABLED
+            and "jarvis" not in spoken_text.lower()
+        )
+
+        if can_barge_in:
+            watcher = threading.Thread(
+                target=_barge_in_watch,
+                args=(
+                    stop_event,
+                    wake_event,
+                ),
+                daemon=True,
+                name="jarvis-barge-in",
+            )
+            watcher.start()
+
+        playback = subprocess.Popen(
             command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
-            check=False,
         )
 
-        if result.returncode != 0:
+        interrupted = False
+
+        while playback.poll() is None:
+            if wake_event.is_set():
+                interrupted = True
+
+                print(
+                    "🛑 BARGE-IN: przerwano odpowiedź.",
+                    flush=True,
+                )
+
+                try:
+                    playback.terminate()
+                    playback.wait(
+                        timeout=0.7
+                    )
+                except Exception:
+                    try:
+                        playback.kill()
+                    except Exception:
+                        pass
+
+                break
+
+            time.sleep(0.05)
+
+        stop_event.set()
+
+        if watcher is not None:
+            watcher.join(
+                timeout=0.5
+            )
+
+        stderr = ""
+
+        if playback.stderr is not None:
+            try:
+                stderr = playback.stderr.read()
+            except Exception:
+                stderr = ""
+
+        if (
+            playback.returncode not in (
+                0,
+                None,
+                -15,
+            )
+            and not interrupted
+        ):
             print(
                 f"[PW-PLAY ERROR] "
-                f"{result.stderr.strip()}",
+                f"{stderr.strip()}",
                 flush=True,
             )
 
-        wait_after_playback()
+        if interrupted:
+            set_gui_state(
+                "listening"
+            )
+        else:
+            wait_after_playback()
 
     except Exception as exc:
         print(
