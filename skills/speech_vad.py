@@ -157,11 +157,14 @@ def _calibrate(process, preroll):
     return True
 
 
-def record_with_speech_vad(filename: str) -> bool:
+def record_with_speech_vad(filename: str, wait_seconds=None) -> bool:
     """
     WebRTC VAD + bramka RMS tylko przy rozpoczęciu wypowiedzi.
     Wymaga kilku ramek mowy, więc pojedynczy trzask/stuknięcie
     nie powinno uruchamiać Whispera.
+
+    wait_seconds pozwala skrócić okno oczekiwania, np. przy komendzie
+    wypowiedzianej od razu po wake-word: "Jarvis, jaka pogoda?".
     """
     global _cached_noise_floor, _cached_threshold
 
@@ -184,6 +187,11 @@ def record_with_speech_vad(filename: str) -> bool:
         int(END_SILENCE_SECONDS / (FRAME_MS / 1000)),
     )
     waiting_started = time.monotonic()
+    wait_limit = (
+        WAIT_SECONDS
+        if wait_seconds is None
+        else max(0.2, float(wait_seconds))
+    )
     speech_started_at = None
     quiet_levels = deque(maxlen=80)
 
@@ -258,7 +266,7 @@ def record_with_speech_vad(filename: str) -> bool:
                     )
                     continue
 
-                if time.monotonic() - waiting_started >= WAIT_SECONDS:
+                if time.monotonic() - waiting_started >= wait_limit:
                     return False
 
                 continue
