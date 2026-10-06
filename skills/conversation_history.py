@@ -111,6 +111,14 @@ def recent_turns(limit=10):
     ]
 
 
+def last_turn():
+    turns = recent_turns(
+        limit=1
+    )
+
+    return turns[-1] if turns else None
+
+
 def recent_messages(
     limit_messages=20,
 ):
