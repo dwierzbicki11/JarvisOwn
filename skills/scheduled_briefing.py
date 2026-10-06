@@ -264,3 +264,54 @@ def briefing_status(
         ] = when.isoformat()
 
     return result
+
+
+
+def format_briefing_status(
+    *,
+    now=None,
+):
+    status = briefing_status(
+        now=now
+    )
+
+    if not status[
+        "enabled"
+    ]:
+        return (
+            "Automatyczne briefingi są wyłączone."
+        )
+
+    next_at = status.get(
+        "next_at"
+    )
+
+    if not next_at:
+        return (
+            "Automatyczne briefingi są aktywne, "
+            "ale nie mam poprawnej godziny następnego briefingu."
+        )
+
+    when = datetime.fromisoformat(
+        next_at
+    )
+
+    kind = status.get(
+        "next_kind"
+    )
+
+    description = (
+        "poranny briefing na dziś"
+        if kind == "today"
+        else "wieczorny briefing na jutro"
+    )
+
+    return (
+        "Następny "
+        + description
+        + " będzie "
+        + when.strftime(
+            "%d.%m o %H:%M"
+        )
+        + "."
+    )
