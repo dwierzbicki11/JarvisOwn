@@ -104,16 +104,53 @@ except Exception as exc:
     fail(f"openWakeWord import: {exc}")
 
 try:
+    from skills.audio_manager import (
+        BT_AUDIO_NAME,
+        active_profile,
+        device_id,
+        sink_id,
+        source_id,
+    )
+
     wpctl = subprocess.check_output(
         ["wpctl", "status"],
         text=True,
         timeout=5,
     )
 
-    if "AP721113" in wpctl:
-        ok("AP721113 widoczny w PipeWire")
+    if BT_AUDIO_NAME in wpctl:
+        ok(f"{BT_AUDIO_NAME} widoczny w PipeWire")
     else:
-        warn("AP721113 niewidoczny w PipeWire")
+        warn(f"{BT_AUDIO_NAME} niewidoczny w PipeWire")
+
+    dev = device_id()
+    sink = sink_id()
+    source = source_id()
+
+    if dev is None:
+        warn("nie znaleziono urządzenia Bluetooth w PipeWire")
+    else:
+        profile = active_profile(dev)
+
+        if profile:
+            codec = (
+                "mSBC"
+                if profile["msbc"]
+                else profile["description"]
+            )
+            ok(f"profil Bluetooth: {codec}")
+        else:
+            warn("nie udało się odczytać aktywnego profilu Bluetooth")
+
+    if sink is not None:
+        ok(f"Bluetooth sink: {sink}")
+    else:
+        warn("brak Bluetooth sink")
+
+    if source is not None:
+        ok(f"Bluetooth source: {source}")
+    else:
+        warn("brak Bluetooth source")
 
 except Exception as exc:
     warn(f"nie udało się odczytać PipeWire: {exc}")
