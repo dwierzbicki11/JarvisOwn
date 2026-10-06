@@ -2,14 +2,15 @@
 PartOf=jarvis.target
 Description=JARVIS Voice Core
 After=network-online.target pipewire.service wireplumber.service
-Wants=network-online.target
+Wants=network-online.target pipewire.service wireplumber.service
 
 [Service]
+StartLimitIntervalSec=0
 Type=simple
 WorkingDirectory=/home/zonderq/jarvis
 ExecStartPre=/home/zonderq/jarvis/wait-audio.sh
 ExecStart=/home/zonderq/jarvis/.venv/bin/python /home/zonderq/jarvis/main.py
-Restart=on-failure
+Restart=always
 RestartSec=5
 Nice=5
 CPUWeight=40
