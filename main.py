@@ -59,7 +59,7 @@ from skills.route_planner import (
 )
 from skills.speech_vad import record_with_speech_vad
 from skills.speech_formatter import speechify_math
-from skills.speaker_verify import verify_wav
+from skills.speaker_verify import profile_status as speaker_profile_status, verify_wav
 from skills.study import detect_study_subject, study_prompt
 from skills.study_materials import (
     find_material,
@@ -177,6 +177,7 @@ _gui_state = {
     "study_mode": None,
     "exam_mode": False,
     "last_latency": {},
+    "speaker": {},
     "updated": time.time(),
 }
 
@@ -186,6 +187,7 @@ def set_gui_state(
     last_user=None,
     last_answer=None,
     latency=None,
+    speaker=None,
 ):
     _gui_state["study_mode"] = study_mode
     _gui_state["exam_mode"] = exam_mode
@@ -201,6 +203,9 @@ def set_gui_state(
 
     if latency is not None:
         _gui_state["last_latency"] = latency
+
+    if speaker is not None:
+        _gui_state["speaker"] = speaker
 
     _gui_state["updated"] = time.time()
 
@@ -770,6 +775,38 @@ def listen_command(wait_seconds=None):
 
         speaker = verify_wav(
             raw_path
+        )
+
+        set_gui_state(
+            speaker={
+                "enabled": bool(
+                    speaker.get(
+                        "enabled",
+                        False,
+                    )
+                ),
+                "enrolled": bool(
+                    speaker.get(
+                        "enrolled",
+                        False,
+                    )
+                ),
+                "accepted": bool(
+                    speaker.get(
+                        "accepted",
+                        True,
+                    )
+                ),
+                "similarity": speaker.get(
+                    "similarity"
+                ),
+                "threshold": speaker.get(
+                    "threshold"
+                ),
+                "reason": speaker.get(
+                    "reason"
+                ),
+            }
         )
 
         if (
@@ -1620,6 +1657,48 @@ def process_command(text):
             + previous["user"]
             + "\n\nPoprzednia odpowiedź:\n"
             + previous["assistant"]
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "status rozpoznawania głosu",
+            "status rozpoznawania glosu",
+            "czy rozpoznajesz mój głos",
+            "czy rozpoznajesz moj glos",
+            "czy rozpoznawanie głosu działa",
+            "czy rozpoznawanie glosu dziala",
+        )
+    ):
+        status = speaker_profile_status()
+
+        print(
+            "🎯 INTENT speaker_status",
+            flush=True,
+        )
+
+        if status.get("error"):
+            return (
+                "Rozpoznawanie głosu zgłasza błąd: "
+                + status["error"]
+            )
+
+        if not status.get("enrolled"):
+            return (
+                "Nie mam jeszcze zapisanego profilu twojego głosu."
+            )
+
+        if not status.get("enabled"):
+            return (
+                "Profil twojego głosu jest zapisany, "
+                "ale weryfikacja jest obecnie wyłączona."
+            )
+
+        return (
+            "Rozpoznawanie twojego głosu jest aktywne. "
+            f"Profil ma {status.get('samples', '?')} próbek, "
+            f"a próg zgodności wynosi "
+            f"{status.get('threshold', 0):.2f}."
         )
 
     # Historia rozmowy - osobna od jawnej pamięci użytkownika.
