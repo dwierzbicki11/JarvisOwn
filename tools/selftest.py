@@ -49,6 +49,18 @@ if os.getenv("GROQ_API_KEY"):
 else:
     fail("brak GROQ_API_KEY w .env")
 
+try:
+    import sqlite3
+
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute(
+            "CREATE VIRTUAL TABLE fts_probe USING fts5(content)"
+        )
+
+    ok("SQLite FTS5: dostępny")
+except Exception as exc:
+    fail(f"SQLite FTS5 niedostępny: {exc}")
+
 voice = os.getenv(
     "TTS_VOICE",
     "pl_PL-mc_speech-medium",
