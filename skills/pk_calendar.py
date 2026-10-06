@@ -654,39 +654,45 @@ def answer_calendar_question(
         }
     }
 
-    # Krótkie follow-upy typu "a laboratorium?" mogą użyć
-    # ostatniej rozmowy jako kontekstu do ustalenia przedmiotu.
+    # Krótkie follow-upy typu "a laboratorium?" używają
+    # nazwy przedmiotu z ostatnich pytań użytkownika. Nie dokładamy
+    # całej odpowiedzi JARVIS-a, bo daty/sale pogarszały dopasowanie.
     if (
         not pure_subject_tokens
         and context_turns
     ):
-        previous_text = " ".join(
-            (
-                str(turn.get("user", ""))
-                + " "
-                + str(turn.get("assistant", ""))
+        for turn in reversed(
+            context_turns[-3:]
+        ):
+            previous_tokens = _calendar_tokens(
+                str(
+                    turn.get(
+                        "user",
+                        "",
+                    )
+                )
             )
-            for turn in context_turns[-3:]
-        )
 
-        previous_tokens = _calendar_tokens(
-            previous_text
-        )
-
-        previous_subject_tokens = {
-            token
-            for token in previous_tokens
-            if token not in {
-                "lab",
-                "wyklad",
-                "cwiczenia",
-                "projekt",
-                "seminarium",
+            previous_subject_tokens = {
+                token
+                for token in previous_tokens
+                if (
+                    token not in {
+                        "lab",
+                        "wyklad",
+                        "cwiczenia",
+                        "projekt",
+                        "seminarium",
+                    }
+                    and not token.isdigit()
+                )
             }
-        }
 
-        if previous_subject_tokens:
-            query_tokens |= previous_subject_tokens
+            if previous_subject_tokens:
+                query_tokens |= (
+                    previous_subject_tokens
+                )
+                break
 
     scored = []
 
