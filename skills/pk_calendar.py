@@ -289,6 +289,18 @@ def _normalize_calendar_text(text):
         if not unicodedata.combining(ch)
     )
 
+    # Niektóre znaki, m.in. polskie ł, nie rozkładają się przez NFKD.
+    # Bez tego "miał" stawało się "mia", przez co naturalne follow-upy
+    # traciły kontekst poprzedniego pytania.
+    value = value.translate(
+        str.maketrans(
+            {
+                "ł": "l",
+                "Ł": "L",
+            }
+        )
+    )
+
     aliases = (
         (r"\blaboratori(?:um|a|ow|ach|ami)\b", " lab "),
         (r"\blaboratoryjn(?:e|y|a|ych|ego)\b", " lab "),
