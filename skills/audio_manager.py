@@ -74,6 +74,166 @@ def bluetooth_connected():
     )
 
 
+def _clamp_percentage(value):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return max(
+        0,
+        min(
+            100,
+            number,
+        ),
+    )
+
+
+def _battery_from_bluetoothctl():
+    """
+    BlueZ często pokazuje np.:
+      Battery Percentage: 0x64 (100)
+
+    Nie wszystkie słuchawki/profile udostępniają tę właściwość.
+    """
+    if not BT_DEVICE_MAC:
+        return None
+
+    result = _run(
+        [
+            "bluetoothctl",
+            "info",
+            BT_DEVICE_MAC,
+        ],
+        timeout=5,
+    )
+
+    if result.returncode != 0:
+        return None
+
+    patterns = (
+        r"Battery Percentage:\s*0x[0-9a-fA-F]+\s*\((\d{1,3})\)",
+        r"Battery Percentage:\s*(\d{1,3})\s*%?",
+        r"Percentage:\s*0x[0-9a-fA-F]+\s*\((\d{1,3})\)",
+        r"Percentage:\s*(\d{1,3})\s*%?",
+    )
+
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            result.stdout,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            return _clamp_percentage(
+                match.group(1)
+            )
+
+    return None
+
+
+def _battery_from_bluez_dbus():
+    """
+    Fallback przez org.bluez.Battery1.
+    busctl zwraca np. "y 87".
+    """
+    if not BT_DEVICE_MAC:
+        return None
+
+    device_name = (
+        "dev_"
+        + BT_DEVICE_MAC.replace(
+            ":",
+            "_",
+        ).upper()
+    )
+
+    for adapter_index in range(4):
+        path = (
+            f"/org/bluez/hci{adapter_index}/"
+            f"{device_name}"
+        )
+
+        result = _run(
+            [
+                "busctl",
+                "--system",
+                "get-property",
+                "org.bluez",
+                path,
+                "org.bluez.Battery1",
+                "Percentage",
+            ],
+            timeout=3,
+        )
+
+        if result.returncode != 0:
+            continue
+
+        match = re.search(
+            r"\by\s+(\d{1,3})\b",
+            result.stdout,
+        )
+
+        if match:
+            return _clamp_percentage(
+                match.group(1)
+            )
+
+    return None
+
+
+def bluetooth_battery():
+    """
+    Zwraca stan baterii skonfigurowanego urządzenia Bluetooth.
+
+    percentage=None oznacza, że BlueZ/urządzenie nie udostępnia
+    poziomu baterii. Nie zgadujemy wartości.
+    """
+    connected = bluetooth_connected()
+
+    result = {
+        "name": BT_AUDIO_NAME,
+        "connected": connected,
+        "available": False,
+        "percentage": None,
+        "source": None,
+    }
+
+    if not connected:
+        return result
+
+    percentage = (
+        _battery_from_bluetoothctl()
+    )
+
+    if percentage is not None:
+        result.update(
+            {
+                "available": True,
+                "percentage": percentage,
+                "source": "bluetoothctl",
+            }
+        )
+        return result
+
+    percentage = (
+        _battery_from_bluez_dbus()
+    )
+
+    if percentage is not None:
+        result.update(
+            {
+                "available": True,
+                "percentage": percentage,
+                "source": "bluez-battery1",
+            }
+        )
+
+    return result
+
+
 def ensure_bluetooth_connected():
     if bluetooth_connected():
         return True
