@@ -92,6 +92,7 @@ body[data-state="sleeping"] .state{opacity:.22}
     <div class="mode" id="speaker-state">GŁOS: --</div>
     <div class="mode" id="focus-state">SKUPIENIE: --</div>
     <div class="mode" id="briefing-state">BRIEFING: --</div>
+    <div class="mode" id="cache-state">DANE: START...</div>
     <div class="mode" id="latency">LATENCY: --</div>
   </div>
 
@@ -187,7 +188,12 @@ function renderLatency(latency){
   return parts.length?parts.join(" • "):"--";
 }
 
+let updateInFlight=false;
+
 async function update(){
+  if(updateInFlight){return;}
+  updateInFlight=true;
+
   try{
     const response=await fetch("/api/status",{cache:"no-store"});
     const data=await response.json();
@@ -275,6 +281,17 @@ async function update(){
     }else{
       briefingElement.textContent="BRIEFING: OFF";
     }
+
+    const cacheState=data.cache||{};
+    const readyCount=(cacheState.ready||[]).length;
+    const runningCount=(cacheState.running||[]).length;
+    const errorCount=Object.keys(cacheState.errors||{}).length;
+    document.getElementById("cache-state").textContent=
+      runningCount
+        ? `DANE: ${readyCount} GOTOWE • ${runningCount} ŁADOWANIE`
+        : errorCount
+          ? `DANE: GOTOWE • ${errorCount} BŁĄD`
+          : "DANE: GOTOWE";
 
     document.getElementById("latency").textContent=`LATENCY: ${renderLatency(data.jarvis.last_latency)}`;
 
@@ -413,6 +430,8 @@ async function update(){
   }catch(error){
     document.body.dataset.state="offline";
     document.getElementById("jarvis-state").textContent="GUI OFFLINE";
+  }finally{
+    updateInFlight=false;
   }
 }
 
