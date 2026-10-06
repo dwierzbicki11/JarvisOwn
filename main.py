@@ -15,6 +15,12 @@ from groq import Groq
 from piper import PiperVoice
 
 from skills.background_events import BackgroundEvents
+from skills.conversation_history import (
+    append_turn,
+    clear_history,
+    format_recent_history,
+    recent_messages,
+)
 from skills.audio_manager import (
     playback_target,
     prepare_audio,
@@ -78,6 +84,15 @@ TTS_MODEL_PATH = TTS_DATA_DIR / f"{TTS_VOICE}.onnx"
 SESSION_SECONDS = float(os.getenv("JARVIS_SESSION_SECONDS", "30"))
 AUTO_SLEEP_MINUTES = float(os.getenv("AUTO_SLEEP_MINUTES", "0"))
 AUDIO_CLEANUP = os.getenv("AUDIO_CLEANUP", "1") == "1"
+CONVERSATION_HISTORY_MESSAGES = max(
+    4,
+    int(
+        os.getenv(
+            "CONVERSATION_HISTORY_MESSAGES",
+            "24",
+        )
+    ),
+)
 SINGLE_UTTERANCE_WAKE = os.getenv(
     "SINGLE_UTTERANCE_WAKE",
     "1",
@@ -104,7 +119,6 @@ print("🔊 Ładowanie Piper...", flush=True)
 tts_voice = PiperVoice.load(str(TTS_MODEL_PATH))
 print("🔊 Piper gotowy.", flush=True)
 
-conversation = []
 english_mode = False
 study_mode = None
 exam_mode = False
@@ -929,8 +943,6 @@ a nie tylko podawaj wynik.
 
 
 def llm_answer(text):
-    global conversation
-
     timer = perf_start(
         "Groq chat"
     )
@@ -976,12 +988,16 @@ def llm_answer(text):
             + remembered
         )
 
+    history_messages = recent_messages(
+        limit_messages=CONVERSATION_HISTORY_MESSAGES
+    )
+
     messages = [
         {
             "role": "system",
             "content": system,
         },
-        *conversation[-12:],
+        *history_messages,
         {
             "role": "user",
             "content": text,
@@ -1004,23 +1020,6 @@ def llm_answer(text):
             .message
             .content
             .strip()
-        )
-
-        conversation.extend(
-            [
-                {
-                    "role": "user",
-                    "content": text,
-                },
-                {
-                    "role": "assistant",
-                    "content": answer,
-                },
-            ]
-        )
-
-        conversation = (
-            conversation[-12:]
         )
 
         return answer
@@ -1261,6 +1260,34 @@ def process_command(text):
 
     set_gui_state("thinking")
     lower = normalize_text(text)
+
+    # Historia rozmowy - osobna od jawnej pamięci użytkownika.
+    if any(
+        phrase in lower
+        for phrase in (
+            "pokaż historię rozmowy",
+            "pokaz historie rozmowy",
+            "co ostatnio mówiłeś",
+            "co ostatnio mowiles",
+            "co mi wcześniej odpowiedziałeś",
+            "co mi wczesniej odpowiedziales",
+        )
+    ):
+        return format_recent_history(
+            limit=6
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "wyczyść historię rozmowy",
+            "wyczysc historie rozmowy",
+            "usuń historię rozmowy",
+            "usun historie rozmowy",
+        )
+    ):
+        clear_history()
+        return "Wyczyściłem historię tej rozmowy."
 
     # Pamięć.
     answer = process_memory_command(
@@ -1766,6 +1793,18 @@ def handle_background_events():
             )
 
             answer = process_command(text)
+
+            try:
+                append_turn(
+                    text,
+                    answer,
+                )
+            except Exception as exc:
+                print(
+                    f"[HISTORY ERROR] {exc}",
+                    flush=True,
+                )
+
             speak(answer)
             continue
 
@@ -1982,6 +2021,17 @@ def main():
             answer = process_command(
                 text
             )
+
+            try:
+                append_turn(
+                    text,
+                    answer,
+                )
+            except Exception as exc:
+                print(
+                    f"[HISTORY ERROR] {exc}",
+                    flush=True,
+                )
 
             speak(
                 answer
