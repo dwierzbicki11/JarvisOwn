@@ -78,6 +78,16 @@ TTS_MODEL_PATH = TTS_DATA_DIR / f"{TTS_VOICE}.onnx"
 SESSION_SECONDS = float(os.getenv("JARVIS_SESSION_SECONDS", "30"))
 AUTO_SLEEP_MINUTES = float(os.getenv("AUTO_SLEEP_MINUTES", "0"))
 AUDIO_CLEANUP = os.getenv("AUDIO_CLEANUP", "1") == "1"
+SINGLE_UTTERANCE_WAKE = os.getenv(
+    "SINGLE_UTTERANCE_WAKE",
+    "1",
+) == "1"
+WAKE_COMMAND_GRACE_SECONDS = float(
+    os.getenv(
+        "WAKE_COMMAND_GRACE_SECONDS",
+        "1.6",
+    )
+)
 
 GUI_STATE_FILE = BASE_DIR / "runtime" / "state.json"
 GUI_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -553,7 +563,7 @@ def transcribe_audio(filename):
         )
 
 
-def listen_command():
+def listen_command(wait_seconds=None):
     raw_path = None
     cleaned_path = None
 
@@ -575,7 +585,8 @@ def listen_command():
         timer = perf_start("VAD")
 
         recorded = record_with_speech_vad(
-            raw_path
+            raw_path,
+            wait_seconds=wait_seconds,
         )
 
         perf_end(
@@ -1766,6 +1777,7 @@ def handle_background_events():
 def main():
     sleep_mode = False
     active_until = 0.0
+    pending_command = None
     last_interaction = (
         time.monotonic()
     )
@@ -1857,23 +1869,53 @@ def main():
                     flush=True,
                 )
 
-                if was_sleeping:
-                    speak(
-                        "Jestem."
-                    )
-                else:
-                    speak(
-                        "Tak?"
+                if SINGLE_UTTERANCE_WAKE:
+                    set_gui_state(
+                        "listening"
                     )
 
-                continue
+                    pending_command = listen_command(
+                        wait_seconds=WAKE_COMMAND_GRACE_SECONDS
+                    )
+
+                    if pending_command:
+                        print(
+                            "⚡ Komenda razem z wake-word.",
+                            flush=True,
+                        )
+                    else:
+                        if was_sleeping:
+                            speak(
+                                "Jestem."
+                            )
+                        else:
+                            speak(
+                                "Tak?"
+                            )
+
+                        continue
+                else:
+                    if was_sleeping:
+                        speak(
+                            "Jestem."
+                        )
+                    else:
+                        speak(
+                            "Tak?"
+                        )
+
+                    continue
 
             # Zdarzenie ma pierwszeństwo
             # przed kolejnym blokującym VAD.
             if background_events.pending():
                 handle_background_events()
 
-            text = listen_command()
+            if pending_command:
+                text = pending_command
+                pending_command = None
+            else:
+                text = listen_command()
 
             if not text:
                 if (
