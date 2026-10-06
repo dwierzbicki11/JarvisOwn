@@ -6,6 +6,7 @@ After=network-online.target jarvis-core.service
 Wants=network-online.target
 
 [Service]
+StartLimitIntervalSec=0
 Type=simple
 WorkingDirectory=/home/zonderq/jarvis
 ExecStart=/home/zonderq/jarvis/.venv/bin/uvicorn jarvis_gui:app --host 0.0.0.0 --port 8765
