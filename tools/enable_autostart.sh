@@ -43,7 +43,8 @@ chmod +x "$RUNTIME_DIR/wait-audio.sh"
 systemctl --user daemon-reload
 
 # Target uruchamia zarówno main.py, jak i stronę WWW.
-systemctl --user enable --now jarvis.target
+# Włączamy też obie usługi osobno jako dodatkowe zabezpieczenie bootu.
+systemctl --user enable     jarvis.target     jarvis-core.service     jarvis-web.service     >/dev/null
 
 # User systemd musi żyć również bez aktywnego logowania po restarcie RPi.
 if command -v loginctl >/dev/null 2>&1; then
@@ -60,11 +61,23 @@ if command -v loginctl >/dev/null 2>&1; then
         elif command -v sudo >/dev/null 2>&1; then
             sudo loginctl enable-linger "$USER"
         else
-            echo "UWAGA: brak sudo. Uruchom jako root:"
-            echo "  loginctl enable-linger $USER"
+            echo "BŁĄD: brak sudo. Uruchom:"
+            echo "  sudo loginctl enable-linger $USER"
+            exit 4
         fi
     fi
+
+    linger="$(
+        loginctl show-user "$USER"             -p Linger             --value 2>/dev/null         || true
+    )"
+
+    if [[ "$linger" != "yes" ]]; then
+        echo "BŁĄD: linger nadal jest wyłączony."
+        exit 4
+    fi
 fi
+
+systemctl --user restart jarvis.target
 
 echo
 echo "Status targetu:"
