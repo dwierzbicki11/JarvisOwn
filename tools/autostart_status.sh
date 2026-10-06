@@ -13,7 +13,7 @@ fi
 
 echo
 echo "Enabled:"
-for unit in     jarvis.target     jarvis-core.service     jarvis-web.service
+for unit in     jarvis.target     jarvis-core.service     jarvis-web.service     jarvis-kiosk.service
 do
     printf "%-24s " "$unit"
     systemctl --user is-enabled "$unit" 2>/dev/null || true
@@ -21,7 +21,7 @@ done
 
 echo
 echo "Active:"
-for unit in     jarvis.target     jarvis-core.service     jarvis-web.service
+for unit in     jarvis.target     jarvis-core.service     jarvis-web.service     jarvis-kiosk.service
 do
     printf "%-24s " "$unit"
     systemctl --user is-active "$unit" 2>/dev/null || true
@@ -34,6 +34,10 @@ pgrep -af "/home/zonderq/jarvis/main.py" || true
 echo
 echo "Proces GUI:"
 pgrep -af "uvicorn jarvis_gui:app" || true
+
+echo
+echo "Proces kiosku:"
+pgrep -af "chromium.*127.0.0.1:8765|firefox.*127.0.0.1:8765" || true
 
 echo
 echo "Ostatnie logi core:"
