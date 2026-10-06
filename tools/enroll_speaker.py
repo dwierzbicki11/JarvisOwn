@@ -1,6 +1,13 @@
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+BASE_DIR = Path.home() / "jarvis"
+sys.path.insert(
+    0,
+    str(BASE_DIR),
+)
 
 from dotenv import load_dotenv
 
@@ -14,7 +21,6 @@ from skills.speech_vad import (
 )
 
 
-BASE_DIR = Path.home() / "jarvis"
 load_dotenv(BASE_DIR / ".env")
 
 SAMPLES = max(
