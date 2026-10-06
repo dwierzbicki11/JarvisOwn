@@ -91,6 +91,7 @@ body[data-state="sleeping"] .state{opacity:.22}
     <div class="mode" id="jarvis-mode">TRYB: STANDARD</div>
     <div class="mode" id="speaker-state">GŁOS: --</div>
     <div class="mode" id="focus-state">SKUPIENIE: --</div>
+    <div class="mode" id="briefing-state">BRIEFING: --</div>
     <div class="mode" id="latency">LATENCY: --</div>
   </div>
 
@@ -252,6 +253,27 @@ async function update(){
         `SKUPIENIE: ${(focus.label||"NAUKA").toUpperCase()} • ${focus.remaining_minutes??0} min`;
     }else{
       focusElement.textContent="SKUPIENIE: OFF";
+    }
+
+    const briefing=data.briefing||{};
+    const briefingElement=document.getElementById("briefing-state");
+
+    if(briefing.enabled && briefing.next_at){
+      const nextBriefing=new Date(briefing.next_at);
+      const formatted=nextBriefing.toLocaleString(
+        "pl-PL",
+        {
+          day:"2-digit",
+          month:"2-digit",
+          hour:"2-digit",
+          minute:"2-digit"
+        }
+      );
+      briefingElement.textContent=`BRIEFING: ${formatted}`;
+    }else if(briefing.enabled){
+      briefingElement.textContent="BRIEFING: AKTYWNY";
+    }else{
+      briefingElement.textContent="BRIEFING: OFF";
     }
 
     document.getElementById("latency").textContent=`LATENCY: ${renderLatency(data.jarvis.last_latency)}`;
