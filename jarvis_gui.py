@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +76,75 @@ def cached(
         function,
         default=default,
     )
+
+
+def cached_background(
+    name,
+    ttl,
+    function,
+    default=None,
+):
+    """
+    Zwraca ostatnią wartość od razu i odświeża ją w tle.
+
+    Dzięki temu wolne źródła (pogoda, GTFS, kalendarz, Bluetooth)
+    nie blokują całego /api/status ani pierwszego renderu GUI.
+    """
+    now = time.monotonic()
+
+    with cache_lock:
+        old = cache.get(
+            name
+        )
+
+        if (
+            old
+            and now - old["time"] < ttl
+        ):
+            return old["value"]
+
+        should_refresh = (
+            name not in cache_refreshing
+        )
+
+        if should_refresh:
+            cache_refreshing.add(
+                name
+            )
+
+    if should_refresh:
+        def worker():
+            try:
+                value = function()
+
+                with cache_lock:
+                    cache[name] = {
+                        "time": time.monotonic(),
+                        "value": value,
+                    }
+
+            except Exception as exc:
+                print(
+                    f"[GUI ASYNC {name}] {exc}",
+                    flush=True,
+                )
+
+            finally:
+                with cache_lock:
+                    cache_refreshing.discard(
+                        name
+                    )
+
+        threading.Thread(
+            target=worker,
+            name=f"jarvis-gui-{name}",
+            daemon=True,
+        ).start()
+
+    if old:
+        return old["value"]
+
+    return default
 
 
 def jarvis_state():
@@ -485,17 +555,17 @@ def status():
                 "%d.%m.%Y"
             ),
         },
-        "weather": cached(
+        "weather": cached_background(
             "weather",
             300,
             weather_data,
         ),
-        "class": cached(
+        "class": cached_background(
             "class",
             120,
             next_class_data,
         ),
-        "transport": cached(
+        "transport": cached_background(
             "transport",
             60,
             lambda: next_departures(
@@ -536,7 +606,7 @@ def status():
             5,
             raid_status,
         ),
-        "services": cached(
+        "services": cached_background(
             "services",
             15,
             lambda: {
@@ -544,17 +614,17 @@ def status():
                 "pihole": pihole_data(),
             },
         ),
-        "study": cached(
+        "study": cached_background(
             "study",
             30,
             study_index_status,
         ),
-        "headphones": cached(
+        "headphones": cached_background(
             "headphones",
             10,
             bluetooth_battery,
         ),
-        "proactive": cached(
+        "proactive": cached_background(
             "proactive",
             30,
             proactive_status,
