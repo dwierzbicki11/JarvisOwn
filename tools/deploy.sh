@@ -24,7 +24,9 @@ if [[ ! -f "$RUNTIME_DIR/.env" ]]; then
     exit 1
 fi
 
-if [[ ! -x "$RUNTIME_DIR/.venv/bin/python" ]]; then
+PYTHON="$RUNTIME_DIR/.venv/bin/python"
+
+if [[ ! -x "$PYTHON" ]]; then
     echo "BŁĄD: brak virtualenv $RUNTIME_DIR/.venv."
     exit 1
 fi
@@ -41,11 +43,22 @@ if [[ -n "$(git -C "$SOURCE_DIR" status --porcelain)" ]]; then
 fi
 
 echo
-echo "2/6 Synchronizacja kodu..."
+echo "2/6 Kontrola składni w repo..."
+"$PYTHON" -m compileall -q     "$SOURCE_DIR/main.py"     "$SOURCE_DIR/jarvis_gui.py"     "$SOURCE_DIR/skills"     "$SOURCE_DIR/tools"     "$SOURCE_DIR/tests"
+
+echo
+echo "3/6 Testy regresyjne przed wdrożeniem..."
+(
+    cd "$SOURCE_DIR"
+    PYTHONPATH="$SOURCE_DIR"         "$PYTHON" -m unittest discover -v tests
+)
+
+echo
+echo "4/6 Synchronizacja kodu..."
 rsync -av --delete     --exclude='.git/'     --exclude='.gitignore'     --exclude='.env'     --exclude='.venv/'     --exclude='voices/'     --exclude='data/'     --exclude='runtime/'     --exclude='cache/'     --exclude='study_materials/'     --exclude='__pycache__/'     --exclude='*.pyc'     "$SOURCE_DIR/"     "$RUNTIME_DIR/"
 
 echo
-echo "3/6 Aktualizacja usług systemd..."
+echo "5/6 Aktualizacja usług systemd..."
 mkdir -p "$USER_SYSTEMD_DIR"
 
 for unit in     jarvis-core.service     jarvis-web.service     jarvis.target
@@ -55,17 +68,6 @@ done
 
 chmod +x "$RUNTIME_DIR/wait-audio.sh"
 systemctl --user daemon-reload
-
-echo
-echo "4/6 Kontrola składni..."
-"$RUNTIME_DIR/.venv/bin/python"     -m compileall -q     "$RUNTIME_DIR/main.py"     "$RUNTIME_DIR/jarvis_gui.py"     "$RUNTIME_DIR/skills"     "$RUNTIME_DIR/tools"     "$RUNTIME_DIR/tests"
-
-echo
-echo "5/6 Testy regresyjne..."
-(
-    cd "$RUNTIME_DIR"
-    "$RUNTIME_DIR/.venv/bin/python"         -m unittest discover -v tests
-)
 
 echo
 echo "6/6 Restart JARVIS-a..."
