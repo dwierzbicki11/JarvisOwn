@@ -33,6 +33,13 @@ echo
 echo "1/6 Aktualizacja repo..."
 git -C "$SOURCE_DIR" pull --ff-only
 
+if [[ -n "$(git -C "$SOURCE_DIR" status --porcelain)" ]]; then
+    echo "BŁĄD: Repozytorium ma lokalne niezatwierdzone zmiany."
+    echo "Deploy przerwany, żeby nie wdrożyć kodu spoza GitHub main."
+    git -C "$SOURCE_DIR" status --short
+    exit 1
+fi
+
 echo
 echo "2/6 Synchronizacja kodu..."
 rsync -av --delete     --exclude='.git/'     --exclude='.gitignore'     --exclude='.env'     --exclude='.venv/'     --exclude='voices/'     --exclude='data/'     --exclude='runtime/'     --exclude='cache/'     --exclude='study_materials/'     --exclude='__pycache__/'     --exclude='*.pyc'     "$SOURCE_DIR/"     "$RUNTIME_DIR/"
@@ -46,6 +53,7 @@ do
     install -m 0644         "$SOURCE_DIR/systemd/$unit"         "$USER_SYSTEMD_DIR/$unit"
 done
 
+chmod +x "$RUNTIME_DIR/wait-audio.sh"
 systemctl --user daemon-reload
 
 echo
