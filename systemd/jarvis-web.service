@@ -1,7 +1,8 @@
 [Unit]
 PartOf=jarvis.target
 Description=JARVIS GUI/API (LAN)
-After=network-online.target
+Requires=jarvis-core.service
+After=network-online.target jarvis-core.service
 Wants=network-online.target
 
 [Service]
