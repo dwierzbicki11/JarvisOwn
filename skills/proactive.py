@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+from skills.audio_manager import bluetooth_battery
 from skills.pk_calendar import get_first_class
 from skills.route_planner import (
     CLASS_BUFFER_MINUTES,
@@ -61,6 +62,20 @@ PROACTIVE_ROUTE_CACHE_SECONDS = int(
     os.getenv(
         "PROACTIVE_ROUTE_CACHE_SECONDS",
         "300",
+    )
+)
+
+PROACTIVE_HEADPHONES_LOW_PERCENT = int(
+    os.getenv(
+        "PROACTIVE_HEADPHONES_LOW_PERCENT",
+        "20",
+    )
+)
+
+PROACTIVE_HEADPHONES_CRITICAL_PERCENT = int(
+    os.getenv(
+        "PROACTIVE_HEADPHONES_CRITICAL_PERCENT",
+        "10",
     )
 )
 
@@ -550,3 +565,111 @@ def class_notification_due(
             return text + "."
 
     return None
+
+
+
+def headphone_battery_notification_due():
+    """
+    Ostrzega raz przy wejściu w niski i krytyczny poziom baterii.
+    Po naładowaniu powyżej progu stan ostrzeżenia resetuje się.
+    """
+    if not PROACTIVE_ENABLED:
+        return None
+
+    battery = bluetooth_battery()
+
+    if (
+        not battery.get(
+            "connected"
+        )
+        or not battery.get(
+            "available"
+        )
+    ):
+        return None
+
+    percentage = battery.get(
+        "percentage"
+    )
+
+    if percentage is None:
+        return None
+
+    state = _load_state()
+    battery_state = state.setdefault(
+        "headphones_battery",
+        {},
+    )
+
+    previous_tier = battery_state.get(
+        "notified_tier"
+    )
+
+    if (
+        percentage
+        > PROACTIVE_HEADPHONES_LOW_PERCENT
+        + 5
+    ):
+        if previous_tier is not None:
+            battery_state[
+                "notified_tier"
+            ] = None
+            battery_state[
+                "last_level"
+            ] = percentage
+            _save_state(
+                state
+            )
+        return None
+
+    if (
+        percentage
+        <= PROACTIVE_HEADPHONES_CRITICAL_PERCENT
+    ):
+        tier = "critical"
+    elif (
+        percentage
+        <= PROACTIVE_HEADPHONES_LOW_PERCENT
+    ):
+        tier = "low"
+    else:
+        return None
+
+    battery_state[
+        "last_level"
+    ] = percentage
+
+    if previous_tier == tier:
+        _save_state(
+            state
+        )
+        return None
+
+    # Po ostrzeżeniu LOW pozwól później zgłosić CRITICAL.
+    # Po CRITICAL nie cofamy się do LOW bez ponownego naładowania.
+    if (
+        previous_tier == "critical"
+        and tier == "low"
+    ):
+        _save_state(
+            state
+        )
+        return None
+
+    battery_state[
+        "notified_tier"
+    ] = tier
+    _save_state(
+        state
+    )
+
+    if tier == "critical":
+        return (
+            "Uwaga. Bateria słuchawek jest krytycznie niska: "
+            f"{percentage} procent."
+        )
+
+    return (
+        "Bateria słuchawek jest niska: "
+        f"{percentage} procent."
+    )
