@@ -59,6 +59,7 @@ from skills.route_planner import (
 )
 from skills.speech_vad import record_with_speech_vad
 from skills.speech_formatter import speechify_math
+from skills.speaker_verify import verify_wav
 from skills.study import detect_study_subject, study_prompt
 from skills.study_materials import (
     find_material,
@@ -766,6 +767,63 @@ def listen_command(wait_seconds=None):
 
         if not recorded:
             return None
+
+        speaker = verify_wav(
+            raw_path
+        )
+
+        if (
+            speaker.get("enabled")
+            and speaker.get("enrolled")
+        ):
+            similarity = speaker.get(
+                "similarity"
+            )
+
+            if similarity is not None:
+                print(
+                    "🗣️ Speaker match="
+                    f"{similarity:.3f} "
+                    f"threshold="
+                    f"{speaker.get('threshold', 0):.3f}",
+                    flush=True,
+                )
+
+        if not speaker.get(
+            "accepted",
+            True,
+        ):
+            print(
+                "🛡️ Odrzucono komendę: "
+                "głos nie pasuje do profilu użytkownika.",
+                flush=True,
+            )
+            return None
+
+        if (
+            speaker.get("reason")
+            == "profile_missing"
+        ):
+            print(
+                "⚠️ Speaker verification jest włączone, "
+                "ale brak profilu. Komenda została przepuszczona.",
+                flush=True,
+            )
+
+        if (
+            speaker.get("reason")
+            == "verification_error"
+        ):
+            print(
+                "[SPEAKER VERIFY ERROR] "
+                + str(
+                    speaker.get(
+                        "error",
+                        "unknown",
+                    )
+                ),
+                flush=True,
+            )
 
         stt_file = raw_path
 
