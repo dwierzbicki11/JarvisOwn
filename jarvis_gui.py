@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from skills.conversation_history import recent_turns
+from skills.focus import current_focus
 from skills.audio_manager import bluetooth_battery
 from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
@@ -448,6 +449,11 @@ def status():
             "tasks",
             5,
             task_data,
+        ),
+        "focus": cached(
+            "focus",
+            2,
+            current_focus,
         ),
         "system": system_data(),
         "network": cached(
