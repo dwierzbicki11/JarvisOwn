@@ -17,6 +17,7 @@ from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
 from skills.reminders import pending_reminders
 from skills.system_health import raid_status, wifi_status
+from skills.study_rag import index_status as study_index_status
 from skills.web_commands import submit_command
 
 BASE_DIR = Path.home() / "jarvis"
@@ -433,5 +434,10 @@ def status():
                 "docker": docker_data(),
                 "pihole": pihole_data(),
             },
+        ),
+        "study": cached(
+            "study",
+            30,
+            study_index_status,
         ),
     }
