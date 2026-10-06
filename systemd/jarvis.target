@@ -1,0 +1,8 @@
+[Unit]
+Description=JARVIS Voice Assistant (core + web)
+Wants=jarvis-core.service jarvis-web.service
+After=network-online.target
+Wants=network-online.target
+
+[Install]
+WantedBy=default.target
