@@ -1,4 +1,5 @@
 [Unit]
+PartOf=jarvis.target
 Description=JARVIS Voice Core
 After=network-online.target pipewire.service wireplumber.service
 Wants=network-online.target
