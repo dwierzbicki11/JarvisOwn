@@ -197,6 +197,7 @@ except Exception as exc:
     warn(f"nie udało się odczytać PipeWire: {exc}")
 
 for service in (
+    "jarvis.target",
     "jarvis-core.service",
     "jarvis-web.service",
 ):
@@ -221,6 +222,33 @@ for service in (
 
     except Exception as exc:
         warn(f"{service}: {exc}")
+
+try:
+    linger = subprocess.run(
+        [
+            "loginctl",
+            "show-user",
+            os.getenv("USER", ""),
+            "-p",
+            "Linger",
+            "--value",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    if linger.stdout.strip() == "yes":
+        ok("systemd user linger: włączony")
+    else:
+        warn(
+            "systemd user linger wyłączony; "
+            "JARVIS może nie wystartować po restarcie bez logowania"
+        )
+
+except Exception as exc:
+    warn(f"systemd user linger: {exc}")
 
 try:
     from skills.system_health import raid_status, wifi_status
