@@ -16,6 +16,7 @@ from skills.conversation_history import recent_turns
 from skills.audio_manager import bluetooth_battery
 from skills.krakow_transport import next_departures
 from skills.pk_calendar import get_first_class
+from skills.proactive import proactive_status
 from skills.reminders import pending_reminders
 from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
@@ -445,5 +446,10 @@ def status():
             "headphones",
             10,
             bluetooth_battery,
+        ),
+        "proactive": cached(
+            "proactive",
+            30,
+            proactive_status,
         ),
     }
