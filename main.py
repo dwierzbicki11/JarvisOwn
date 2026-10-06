@@ -1118,6 +1118,19 @@ def today_brief():
             flush=True,
         )
 
+    try:
+        parts.append(
+            format_pending_tasks(
+                limit=5
+            )
+        )
+    except Exception as exc:
+        print(
+            f"[BRIEF TASK ERROR] "
+            f"{exc}",
+            flush=True,
+        )
+
     return " ".join(
         part
         for part in parts
@@ -1176,6 +1189,19 @@ def tomorrow_brief():
     except Exception as exc:
         print(
             f"[BRIEF ALERT ERROR] "
+            f"{exc}",
+            flush=True,
+        )
+
+    try:
+        parts.append(
+            format_pending_tasks(
+                limit=5
+            )
+        )
+    except Exception as exc:
+        print(
+            f"[BRIEF TASK ERROR] "
             f"{exc}",
             flush=True,
         )
@@ -2504,6 +2530,25 @@ def handle_background_events():
             f"{text}",
             flush=True,
         )
+
+        if event_type == "briefing":
+            kind = event.get(
+                "kind"
+            )
+
+            set_gui_state(
+                "thinking"
+            )
+
+            if kind == "tomorrow":
+                answer = tomorrow_brief()
+            else:
+                answer = today_brief()
+
+            speak(
+                answer
+            )
+            continue
 
         if event_type == "web_command":
             set_gui_state(
