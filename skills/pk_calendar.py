@@ -140,3 +140,122 @@ def get_next_class():
         return text + "."
 
     return "Nie widzę najbliższych zajęć w kalendarzu."
+
+
+def _normalize_subject(text):
+    import unicodedata
+    import re
+
+    text = unicodedata.normalize("NFKD", text.lower())
+    text = "".join(
+        ch for ch in text
+        if not unicodedata.combining(ch)
+    )
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def find_subject_schedule(subject, days=120):
+    """
+    Szuka najbliższych wystąpień konkretnego przedmiotu
+    w kalendarzu PK.
+    """
+    from difflib import SequenceMatcher
+
+    subject_norm = _normalize_subject(subject)
+
+    if not subject_norm:
+        return "Nie podałeś nazwy przedmiotu."
+
+    now = datetime.now(TIMEZONE)
+    start = now
+    end = now + timedelta(days=days)
+
+    try:
+        events = _events_between(start, end)
+    except Exception as exc:
+        return f"Nie mogę pobrać planu zajęć. {exc}"
+
+    matches = []
+
+    for event in events:
+        summary = event["summary"]
+        summary_norm = _normalize_subject(summary)
+
+        score = SequenceMatcher(
+            None,
+            subject_norm,
+            summary_norm,
+        ).ratio()
+
+        # Najlepiej działa dla:
+        # "analiza matematyczna"
+        # "analiza"
+        # lekko przekręconej nazwy przez Whispera.
+        if (
+            subject_norm in summary_norm
+            or summary_norm in subject_norm
+            or score >= 0.58
+        ):
+            matches.append(
+                (score, event)
+            )
+
+    if not matches:
+        return (
+            f"Nie znalazłem przedmiotu {subject} "
+            "w twoim kalendarzu."
+        )
+
+    matches.sort(
+        key=lambda item: (
+            item[1]["start"],
+            -item[0],
+        )
+    )
+
+    weekdays = {
+        0: "poniedziałek",
+        1: "wtorek",
+        2: "środę",
+        3: "czwartek",
+        4: "piątek",
+        5: "sobotę",
+        6: "niedzielę",
+    }
+
+    # Najbliższe trzy wystąpienia.
+    selected = [
+        item[1]
+        for item in matches[:3]
+    ]
+
+    parts = []
+
+    for event in selected:
+        start_dt = event["start"]
+        end_dt = event["end"]
+
+        when = weekdays[
+            start_dt.weekday()
+        ]
+
+        part = (
+            f"{event['summary']} masz w {when}, "
+            f"{start_dt.strftime('%d.%m')} "
+            f"od {start_dt.strftime('%H:%M')} "
+            f"do {end_dt.strftime('%H:%M')}"
+        )
+
+        if event["location"]:
+            part += (
+                f", {event['location']}"
+            )
+
+        parts.append(part)
+
+    return (
+        "Najbliższe terminy: "
+        + "; ".join(parts)
+        + "."
+    )

@@ -28,7 +28,7 @@ from skills.memory_store import (
     recent_memories,
     remember,
 )
-from skills.pk_calendar import get_first_class, get_next_class, get_schedule
+from skills.pk_calendar import get_first_class, get_next_class, get_schedule, find_subject_schedule
 from skills.reminders import (
     add_reminder,
     cancel_latest,
@@ -44,6 +44,7 @@ from skills.route_planner import (
     format_journey,
 )
 from skills.speech_vad import record_with_speech_vad
+from skills.speech_formatter import speechify_math
 from skills.study import detect_study_subject, study_prompt
 from skills.study_materials import (
     find_material,
@@ -274,7 +275,11 @@ def normalize_for_speech(text: str) -> str:
         "Raspberry Pi": "Raspberry Paj",
     }
 
-    spoken = text
+    spoken = speechify_math(
+        text,
+        client=client,
+        model=CHAT_MODEL,
+    )
 
     for source in sorted(replacements, key=len, reverse=True):
         spoken = spoken.replace(
@@ -448,8 +453,10 @@ def clean_audio(source, destination):
                 source,
                 "-af",
                 (
-                    "highpass=f=80,"
-                    "lowpass=f=7500,"
+                    "highpass=f=100,"
+                    "lowpass=f=7200,"
+                    "afftdn=nf=-25,"
+                    "acompressor=threshold=-24dB:ratio=4:attack=8:release=120,"
                     "loudnorm=I=-20:TP=-2:LRA=7"
                 ),
                 "-ar",
@@ -1261,6 +1268,105 @@ def process_command(text):
 
     if answer:
         return answer
+
+    # Dojazd ma pierwszeństwo przed ogólnym pytaniem o plan zajęć.
+    # Obsługuje naturalne warianty wypowiedzi głosowej.
+    commute_words = (
+        "wyjść",
+        "wyjsc",
+        "wychodz",
+        "dojad",
+        "dojech",
+        "dojazd",
+    )
+
+    commute_destinations = (
+        "uczeln",
+        "zaję",
+        "zaje",
+        "na pk",
+        "z domu",
+        "domu",
+    )
+
+    if (
+        "jutro" in lower
+        and any(word in lower for word in commute_words)
+        and any(word in lower for word in commute_destinations)
+    ):
+        print(
+            "🎯 INTENT commute_tomorrow",
+            flush=True,
+        )
+
+        return trip_to_first_class(
+            day_offset=1
+        )
+
+    # Pytania o konkretny przedmiot w planie.
+    subject_patterns = (
+        r"kiedy mam przedmiot[?.,:\s]*(.+)",
+        r"kiedy mam zajęcia z[?.,:\s]*(.+)",
+        r"kiedy mam zajecia z[?.,:\s]*(.+)",
+        r"kiedy mam[?.,:\s]*(.+)",
+        r"kiedy jest[?.,:\s]*(.+)",
+        r"o której mam[?.,:\s]*(.+)",
+        r"o ktorej mam[?.,:\s]*(.+)",
+    )
+
+    calendar_words = (
+        "przedmiot",
+        "zajęcia",
+        "zajecia",
+        "kiedy mam",
+        "kiedy jest",
+        "o której mam",
+        "o ktorej mam",
+    )
+
+    if any(word in lower for word in calendar_words):
+        for pattern in subject_patterns:
+            match = re.search(
+                pattern,
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            if not match:
+                continue
+
+            subject = (
+                match.group(1)
+                .strip()
+                .strip(" ?.!,")
+            )
+
+            # Nie przechwytuj ogólnych pytań typu
+            # "kiedy mam autobus".
+            blocked = (
+                "autobus",
+                "wyjść",
+                "wyjsc",
+                "dojechać",
+                "dojechac",
+            )
+
+            if (
+                subject
+                and not any(
+                    word in subject.lower()
+                    for word in blocked
+                )
+            ):
+                print(
+                    f"🎯 INTENT subject_schedule: "
+                    f"{subject}",
+                    flush=True,
+                )
+
+                return find_subject_schedule(
+                    subject
+                )
 
     # Odporny router komend głosowych.
     # Whisper może np. zgubić polski znak albo lekko przekręcić frazę.
