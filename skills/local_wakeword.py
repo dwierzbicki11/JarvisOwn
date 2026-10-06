@@ -175,14 +175,25 @@ def _jarvis_score(predictions):
     return best_name, best_score
 
 
-def wait_for_jarvis(tick_callback=None):
+def wait_for_jarvis(
+    tick_callback=None,
+    *,
+    timeout=None,
+    stop_event=None,
+    threshold=None,
+    required_hits=None,
+    announce=True,
+):
     """
     Zwraca:
       "wake" - wykryto wake-word,
       "tick" - callback zgłosił zdarzenie,
-      None   - capture zakończony/błąd.
+      None   - timeout, stop_event albo capture zakończony/błąd.
 
-    Audio nie opuszcza RPi w trybie czuwania.
+    Parametry opcjonalne pozwalają użyć tego samego detektora
+    do barge-in podczas wypowiedzi JARVIS-a.
+
+    Audio nie opuszcza RPi.
     """
     process = subprocess.Popen(
         [
@@ -202,15 +213,29 @@ def wait_for_jarvis(tick_callback=None):
         bufsize=0,
     )
 
+    effective_threshold = (
+        WAKE_THRESHOLD
+        if threshold is None
+        else float(threshold)
+    )
+    effective_required_hits = max(
+        1,
+        REQUIRED_HITS
+        if required_hits is None
+        else int(required_hits),
+    )
+
     scores = deque(maxlen=SCORE_WINDOW)
     hits = deque(maxlen=SCORE_WINDOW)
 
-    print(
-        "🌙 Czekam lokalnie na „Jarvis”…",
-        flush=True,
-    )
+    if announce:
+        print(
+            "🌙 Czekam lokalnie na „Jarvis”…",
+            flush=True,
+        )
 
-    last_tick = time.monotonic()
+    started_at = time.monotonic()
+    last_tick = started_at
 
     try:
         if process.stdout is None:
@@ -218,6 +243,18 @@ def wait_for_jarvis(tick_callback=None):
 
         while True:
             now = time.monotonic()
+
+            if (
+                stop_event is not None
+                and stop_event.is_set()
+            ):
+                return None
+
+            if (
+                timeout is not None
+                and now - started_at >= float(timeout)
+            ):
+                return None
 
             if (
                 tick_callback is not None
@@ -277,7 +314,7 @@ def wait_for_jarvis(tick_callback=None):
 
             hits.append(
                 1
-                if score >= WAKE_THRESHOLD
+                if score >= effective_threshold
                 else 0
             )
 
@@ -300,8 +337,8 @@ def wait_for_jarvis(tick_callback=None):
 
             if (
                 model_name
-                and len(hits) >= REQUIRED_HITS
-                and sum(hits) >= REQUIRED_HITS
+                and len(hits) >= effective_required_hits
+                and sum(hits) >= effective_required_hits
             ):
                 average = (
                     sum(scores)
@@ -310,7 +347,7 @@ def wait_for_jarvis(tick_callback=None):
 
                 if (
                     average
-                    < WAKE_THRESHOLD * 0.65
+                    < effective_threshold * 0.65
                 ):
                     continue
 
