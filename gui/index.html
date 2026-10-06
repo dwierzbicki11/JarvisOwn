@@ -97,6 +97,9 @@ body[data-state="sleeping"] .state{opacity:.22}
       <div class="title">KOMUNIKACJA / PRZYPOMNIENIA</div>
       <div class="normal" id="transport">Pobieranie odjazdów...</div>
       <br>
+      <div class="normal" id="leave-plan">Wyjście na uczelnię: --</div>
+      <div class="small" id="leave-plan-details"></div>
+      <br>
       <div class="small" id="reminders">Brak przypomnień.</div>
     </div>
     <div class="card">
@@ -245,6 +248,39 @@ async function update(){
         : `Materiały: ${study.files??0} plików • ${study.chunks??0} fragmentów`;
 
     document.getElementById("transport").textContent=data.transport||"Brak danych";
+
+    const proactive=data.proactive||{};
+    const leavePlan=document.getElementById("leave-plan");
+    const leaveDetails=document.getElementById("leave-plan-details");
+
+    if(proactive.active && proactive.leave_time){
+      const minutes=proactive.minutes_to_leave;
+      let countdown="";
+      if(minutes!==null && minutes!==undefined){
+        if(minutes>1){
+          countdown=` • za ok. ${minutes} min`;
+        }else if(minutes>=-2){
+          countdown=" • WYJDŹ TERAZ";
+        }else{
+          countdown=" • plan wyjścia minął";
+        }
+      }
+
+      leavePlan.textContent=
+        `Wyjście na uczelnię: ${proactive.leave_time}${countdown}`;
+
+      const transportPlan=proactive.transport||{};
+      leaveDetails.textContent=
+        transportPlan.route
+          ? `Linia ${transportPlan.route} • odjazd ${transportPlan.departure||"--"} • ${transportPlan.from||""}`
+          : (proactive.route_error||"");
+    }else if(proactive.active){
+      leavePlan.textContent="Wyjście na uczelnię: brak wyliczonej trasy";
+      leaveDetails.textContent=proactive.route_error||"";
+    }else{
+      leavePlan.textContent="Wyjście na uczelnię: brak na teraz";
+      leaveDetails.textContent="";
+    }
 
     const reminders=data.reminders||[];
     document.getElementById("reminders").innerHTML=reminders.length
