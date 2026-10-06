@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -55,6 +56,15 @@ PROACTIVE_PLAN_HORIZON_HOURS = int(
         "6",
     )
 )
+
+PROACTIVE_ROUTE_CACHE_SECONDS = int(
+    os.getenv(
+        "PROACTIVE_ROUTE_CACHE_SECONDS",
+        "300",
+    )
+)
+
+_ROUTE_CACHE = {}
 
 
 def _load_state():
@@ -205,14 +215,42 @@ def commute_plan_for_first_class(
         )
     )
 
-    journey = find_journey(
-        target_date=event[
-            "start"
-        ].date(),
-        origin_name=HOME_STOP,
-        destination_name=PK_STOP,
-        latest_arrival=latest_arrival,
+    route_key = (
+        event["start"].isoformat()
+        + "|"
+        + event["summary"]
     )
+
+    cached = _ROUTE_CACHE.get(
+        route_key
+    )
+
+    if (
+        cached
+        and time.monotonic()
+        - cached["time"]
+        < PROACTIVE_ROUTE_CACHE_SECONDS
+    ):
+        journey = cached[
+            "journey"
+        ]
+    else:
+        journey = find_journey(
+            target_date=event[
+                "start"
+            ].date(),
+            origin_name=HOME_STOP,
+            destination_name=PK_STOP,
+            latest_arrival=latest_arrival,
+        )
+
+        _ROUTE_CACHE.clear()
+        _ROUTE_CACHE[
+            route_key
+        ] = {
+            "time": time.monotonic(),
+            "journey": journey,
+        }
 
     if (
         not journey
