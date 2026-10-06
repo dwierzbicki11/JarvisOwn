@@ -2601,6 +2601,22 @@ def handle_background_events():
             speak(answer)
             continue
 
+        if event_type == "briefing":
+            kind = event.get(
+                "kind"
+            )
+
+            if kind == "tomorrow":
+                speak(
+                    tomorrow_brief()
+                )
+            else:
+                speak(
+                    today_brief()
+                )
+
+            continue
+
         speak(text)
 
     return True
