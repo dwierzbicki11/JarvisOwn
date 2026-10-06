@@ -19,6 +19,7 @@ from skills.conversation_history import (
     append_turn,
     clear_history,
     format_recent_history,
+    last_turn,
     recent_messages,
     recent_turns,
 )
@@ -1339,6 +1340,91 @@ def process_command(text):
 
     set_gui_state("thinking")
     lower = normalize_text(text)
+
+    # Naturalne odwołania do poprzedniej odpowiedzi.
+    if lower in (
+        "powtórz",
+        "powtorz",
+        "powiedz jeszcze raz",
+        "powiedz to jeszcze raz",
+        "co mówiłeś",
+        "co mowiles",
+    ):
+        previous = last_turn()
+
+        if not previous:
+            return "Nie mam jeszcze poprzedniej odpowiedzi do powtórzenia."
+
+        print(
+            "🎯 INTENT conversation_repeat",
+            flush=True,
+        )
+
+        return previous["assistant"]
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "powiedz to krócej",
+            "powiedz to krocej",
+            "streść to",
+            "streszcz to",
+            "krócej",
+            "krocej",
+        )
+    ):
+        previous = last_turn()
+
+        if not previous:
+            return "Nie mam jeszcze odpowiedzi, którą mógłbym skrócić."
+
+        print(
+            "🎯 INTENT conversation_shorten",
+            flush=True,
+        )
+
+        return llm_answer(
+            "Skróć poniższą poprzednią odpowiedź JARVIS-a. "
+            "Zachowaj wszystkie kluczowe fakty i nie dodawaj nowych informacji. "
+            "Odpowiedz naturalnie do przeczytania głosowego.\n\n"
+            "Poprzednie pytanie użytkownika:\n"
+            + previous["user"]
+            + "\n\nPoprzednia odpowiedź JARVIS-a:\n"
+            + previous["assistant"]
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "wyjaśnij to inaczej",
+            "wyjasnij to inaczej",
+            "rozwiń to",
+            "rozwin to",
+            "wytłumacz to inaczej",
+            "wytlumacz to inaczej",
+        )
+    ):
+        previous = last_turn()
+
+        if not previous:
+            return "Nie mam jeszcze odpowiedzi, do której mogę się odwołać."
+
+        print(
+            "🎯 INTENT conversation_rephrase",
+            flush=True,
+        )
+
+        return llm_answer(
+            "Odnieś się wyłącznie do poprzedniej rozmowy poniżej. "
+            "Wyjaśnij odpowiedź inaczej lub szerzej zgodnie z poleceniem użytkownika. "
+            "Nie zmieniaj faktów pochodzących z lokalnych danych.\n\n"
+            "Polecenie użytkownika:\n"
+            + text
+            + "\n\nPoprzednie pytanie:\n"
+            + previous["user"]
+            + "\n\nPoprzednia odpowiedź:\n"
+            + previous["assistant"]
+        )
 
     # Historia rozmowy - osobna od jawnej pamięci użytkownika.
     if any(
