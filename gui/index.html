@@ -102,6 +102,9 @@ body[data-state="sleeping"] .state{opacity:.22}
       <div class="small" id="leave-plan-details"></div>
       <br>
       <div class="small" id="reminders">Brak przypomnień.</div>
+      <br>
+      <div class="title" style="margin-top:.6vh">ZADANIA</div>
+      <div class="small" id="tasks">Brak zadań.</div>
     </div>
     <div class="card">
       <div class="title">SYSTEM</div>
@@ -304,6 +307,21 @@ async function update(){
     document.getElementById("reminders").innerHTML=reminders.length
       ? reminders.map(r=>`${r.time} — ${r.text}`).join("<br>")
       : "Brak przypomnień.";
+
+    const tasks=data.tasks||[];
+    const tasksElement=document.getElementById("tasks");
+
+    if(tasks.length){
+      tasksElement.innerHTML="";
+      for(const task of tasks){
+        const row=document.createElement("div");
+        row.textContent=
+          `${task.priority?"⚠ ":""}${task.text}${task.due?" • "+task.due:""}`;
+        tasksElement.appendChild(row);
+      }
+    }else{
+      tasksElement.textContent="Brak zadań.";
+    }
 
     const system=data.system;
     document.getElementById("cpu-value").textContent=`${system.cpu}%`;
