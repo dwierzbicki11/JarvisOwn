@@ -141,6 +141,58 @@ class CalendarRouterTests(unittest.TestCase):
 
         self.assertIsNone(answer)
 
+    def test_calendar_followup_lecture_uses_history(self):
+        context = [
+            {
+                "user": (
+                    "Kiedy będę miał techniki pomiarowe "
+                    "dla informatyków?"
+                ),
+                "assistant": (
+                    "Najbliższe terminy zajęć podałem wcześniej."
+                ),
+            }
+        ]
+
+        answer = self.answer(
+            "A wykład?",
+            context_turns=context,
+        )
+
+        self.assertIsNotNone(answer)
+        self.assertIn(
+            "Techniki pomiarowe dla informatyków",
+            answer,
+        )
+        self.assertIn(
+            "A124",
+            answer,
+        )
+
+    def test_calendar_followup_room_uses_history(self):
+        context = [
+            {
+                "user": (
+                    "Kiedy będę miał techniki pomiarowe "
+                    "dla informatyków?"
+                ),
+                "assistant": (
+                    "Najbliższe terminy zajęć podałem wcześniej."
+                ),
+            }
+        ]
+
+        answer = self.answer(
+            "A w jakiej sali?",
+            context_turns=context,
+        )
+
+        self.assertIsNotNone(answer)
+        self.assertIn(
+            "Techniki pomiarowe dla informatyków",
+            answer,
+        )
+
     def test_calendar_followup_uses_history(self):
         context = [
             {
