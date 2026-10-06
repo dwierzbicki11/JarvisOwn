@@ -5,6 +5,7 @@ import time
 
 from skills.proactive import class_notification_due, headphone_battery_notification_due
 from skills.focus import pop_due_focus_notice
+from skills.health_alerts import health_alert_due
 from skills.reminders import has_due_reminders, pop_due_reminders
 from skills.scheduled_briefing import briefing_due
 from skills.tasks import pop_due_task_notices
@@ -70,6 +71,16 @@ BRIEFING_CHECK_SECONDS = max(
     ),
 )
 
+HEALTH_CHECK_SECONDS = max(
+    60,
+    int(
+        os.getenv(
+            "HEALTH_CHECK_SECONDS",
+            "120",
+        )
+    ),
+)
+
 
 class BackgroundEvents:
     def __init__(self):
@@ -81,6 +92,7 @@ class BackgroundEvents:
         self._last_task_check = 0.0
         self._last_focus_check = 0.0
         self._last_briefing_check = 0.0
+        self._last_health_check = 0.0
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -270,6 +282,26 @@ class BackgroundEvents:
                 except Exception as exc:
                     print(
                         f"[BACKGROUND BRIEFING ERROR] {exc}",
+                        flush=True,
+                    )
+
+            if now - self._last_health_check >= HEALTH_CHECK_SECONDS:
+                self._last_health_check = now
+
+                try:
+                    notice = health_alert_due()
+
+                    if notice:
+                        self.queue.put(
+                            {
+                                "type": "health",
+                                "text": notice,
+                            }
+                        )
+
+                except Exception as exc:
+                    print(
+                        f"[BACKGROUND HEALTH ERROR] {exc}",
                         flush=True,
                     )
 
