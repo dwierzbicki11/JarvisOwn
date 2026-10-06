@@ -56,6 +56,12 @@ from skills.tasks import (
     format_pending as format_pending_tasks,
     parse_task_command,
 )
+from skills.focus import (
+    format_focus_status,
+    parse_focus_start,
+    start_focus,
+    stop_focus,
+)
 from skills.route_planner import (
     CLASS_BUFFER_MINUTES,
     HOME_STOP,
@@ -1525,6 +1531,75 @@ def process_memory_command(
     return None
 
 
+def process_focus_command(
+    text,
+    lower,
+):
+    parsed = parse_focus_start(
+        text
+    )
+
+    if parsed:
+        session = start_focus(
+            parsed["minutes"],
+            label=parsed[
+                "label"
+            ],
+        )
+
+        return (
+            "Zaczynam sesję "
+            + session["label"]
+            + " na "
+            + str(
+                session[
+                    "minutes"
+                ]
+            )
+            + " minut. Dam znać, gdy czas minie."
+        )
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "ile zostało sesji",
+            "ile zostało skupienia",
+            "ile zostalo sesji",
+            "ile zostalo skupienia",
+            "status skupienia",
+            "status sesji nauki",
+        )
+    ):
+        return format_focus_status()
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "zakończ sesję",
+            "zakoncz sesje",
+            "zatrzymaj sesję",
+            "zatrzymaj sesje",
+            "wyłącz skupienie",
+            "wylacz skupienie",
+            "przerwij pomodoro",
+        )
+    ):
+        label = stop_focus()
+
+        if not label:
+            return (
+                "Nie masz aktywnej sesji skupienia."
+            )
+
+        return (
+            "Zakończyłem sesję "
+            + label
+            + "."
+        )
+
+    return None
+
+
 def process_task_command(
     text,
     lower,
@@ -1854,6 +1929,15 @@ def process_command(text):
 
     # Pamięć.
     answer = process_memory_command(
+        text,
+        lower,
+    )
+
+    if answer:
+        return answer
+
+    # Sesje skupienia / Pomodoro.
+    answer = process_focus_command(
         text,
         lower,
     )
