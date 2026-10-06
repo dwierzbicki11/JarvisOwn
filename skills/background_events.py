@@ -3,7 +3,7 @@ import queue
 import threading
 import time
 
-from skills.proactive import class_notification_due
+from skills.proactive import class_notification_due, headphone_battery_notification_due
 from skills.reminders import has_due_reminders, pop_due_reminders
 from skills.web_commands import has_pending_commands, pop_pending_commands
 
@@ -17,6 +17,16 @@ PROACTIVE_CHECK_SECONDS = max(
     ),
 )
 
+BATTERY_CHECK_SECONDS = max(
+    60,
+    int(
+        os.getenv(
+            "BATTERY_CHECK_SECONDS",
+            "300",
+        )
+    ),
+)
+
 
 class BackgroundEvents:
     def __init__(self):
@@ -24,6 +34,7 @@ class BackgroundEvents:
         self._stop = threading.Event()
         self._thread = None
         self._last_class_check = 0.0
+        self._last_battery_check = 0.0
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -107,6 +118,26 @@ class BackgroundEvents:
                 except Exception as exc:
                     print(
                         f"[BACKGROUND CLASS ERROR] {exc}",
+                        flush=True,
+                    )
+
+            if now - self._last_battery_check >= BATTERY_CHECK_SECONDS:
+                self._last_battery_check = now
+
+                try:
+                    notice = headphone_battery_notification_due()
+
+                    if notice:
+                        self.queue.put(
+                            {
+                                "type": "headphones_battery",
+                                "text": notice,
+                            }
+                        )
+
+                except Exception as exc:
+                    print(
+                        f"[BACKGROUND BATTERY ERROR] {exc}",
                         flush=True,
                     )
 
