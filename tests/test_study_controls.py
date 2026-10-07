@@ -27,7 +27,8 @@ class RouterIntegrationTests(unittest.TestCase):
         env = {'english_mode': False, 'exam_mode': True, 'study_style': 'kroki',
                'set_gui_state': lambda *args: None, 'normalize_text': lambda text: text.lower(),
                'study_control': study_control, 'process_flashcard_command': lambda text: None,
-               'process_code_command': lambda text: None}
+               'process_code_command': lambda text: None,
+               'process_repo_command': lambda text: None}
         exec(compile(ast.Module(body=[function], type_ignores=[]), 'main.py', 'exec'), env)
         env['process_command']('wyłącz tryb egzaminu')
         self.assertFalse(env['exam_mode'])

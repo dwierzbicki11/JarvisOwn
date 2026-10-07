@@ -17,6 +17,7 @@ from piper import PiperVoice
 
 from skills.flashcards import process_flashcard_command
 from skills.code_tutor import process_code_command
+from skills.repo_workspace import process_repo_command
 from skills.core_heartbeat import CoreHeartbeat
 from skills.background_events import BackgroundEvents
 from skills.conversation_history import (
@@ -1838,6 +1839,9 @@ def process_command(text):
     code_reply = process_code_command(text)
     if code_reply is not None:
         return code_reply
+    repo_reply = process_repo_command(text)
+    if repo_reply is not None:
+        return repo_reply
     lower = normalize_text(text)
 
     if any(
