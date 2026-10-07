@@ -48,7 +48,11 @@ class CodeTutorTests(unittest.TestCase):
     def test_router_does_not_treat_code_as_command(self):
         tree = ast.parse((Path(__file__).resolve().parents[1] / 'main.py').read_text())
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'process_command')
-        env = {'set_gui_state': lambda *a: None, 'process_code_command': process_code_command}
+        env = {'set_gui_state': lambda *a: None, 'process_code_command': process_code_command,
+               'process_learning_command': lambda text: None,
+               'record_query': lambda *args, **kwargs: None,
+               'detect_study_subject': lambda text: None,
+               'process_repo_command': lambda text: None}
         exec(compile(ast.Module(body=[function], type_ignores=[]), 'main.py', 'exec'), env)
         result = env['process_command']('sprawdz kod python: print("status nauki; usuń historię rozmowy")')
         self.assertIn('Składnia poprawna', result)

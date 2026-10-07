@@ -18,6 +18,7 @@ from piper import PiperVoice
 from skills.flashcards import process_flashcard_command
 from skills.code_tutor import process_code_command
 from skills.repo_workspace import process_repo_command
+from skills.user_learning import context as learning_context, process_learning_command, record_query
 from skills.core_heartbeat import CoreHeartbeat
 from skills.background_events import BackgroundEvents
 from skills.conversation_history import (
@@ -1269,6 +1270,10 @@ def llm_answer(text):
 
     system = SYSTEM_PROMPT
 
+    learned = learning_context()
+    if learned:
+        system += "\n\n" + learned
+
     if subject:
         system += (
             "\n\n"
@@ -1836,6 +1841,10 @@ def process_command(text):
     global study_style
 
     set_gui_state("thinking")
+    learning_reply = process_learning_command(text)
+    if learning_reply is not None:
+        return learning_reply
+    record_query(text, route="command", subject=detect_study_subject(text))
     code_reply = process_code_command(text)
     if code_reply is not None:
         return code_reply
