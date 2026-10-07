@@ -38,6 +38,7 @@ from skills.memory_store import (
     memory_context,
     recent_memories,
     remember,
+    search_memories,
 )
 from skills.pk_calendar import (
     answer_calendar_question,
@@ -1532,6 +1533,22 @@ def process_memory_command(
         "co pamiętasz" in lower
         or "co pamietasz" in lower
     ):
+        topic_match = re.search(
+            r"co (?:pamiętasz|pamietasz) (?:o|na temat) (.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if topic_match:
+            topic = topic_match.group(1).strip().rstrip("?.!")
+            rows = search_memories(topic, limit=8)
+            if not rows:
+                return f"Nie mam zapisanej pamięci na temat: {topic}."
+            return (
+                f"Na temat {topic} pamiętam: "
+                + "; ".join(row["text"] for row in rows)
+                + "."
+            )
+
         rows = recent_memories(
             limit=8
         )
@@ -2904,3 +2921,4 @@ if __name__ == "__main__":
             "\nJARVIS zatrzymany.",
             flush=True,
         )
+
