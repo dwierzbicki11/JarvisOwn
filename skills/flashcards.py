@@ -42,9 +42,7 @@ def _connect():
 
 
 def add_card(question, answer, now=None):
-    question, answer = question.strip(), answer.strip()
-    if not question or not answer or len(question) > 1000 or len(answer) > 4000:
-        raise ValueError('Podaj pytanie do 1000 znaków i odpowiedź do 4000 znaków.')
+    question, answer = _validate(question, answer)
     with _connect() as conn:
         conn.execute('INSERT OR IGNORE INTO flashcards(question, answer, due_at) VALUES(?, ?, ?)',
                      (question, answer, _now(now).isoformat()))
@@ -124,3 +122,37 @@ def process_flashcard_command(text):
             conn.execute('UPDATE flashcard_session SET card_id=NULL, revealed=0 WHERE singleton=1')
         return 'Powtórka fiszek zakończona.'
     return None
+
+
+def _validate(question, answer):
+    question, answer = question.strip(), answer.strip()
+    if not question or not answer or len(question) > 1000 or len(answer) > 4000:
+        raise ValueError('Podaj pytanie do 1000 znaków i odpowiedź do 4000 znaków.')
+    return question, answer
+
+
+def list_cards():
+    with _connect() as conn:
+        return [dict(row) for row in conn.execute('SELECT * FROM flashcards ORDER BY id DESC')]
+
+
+def edit_card(card_id, question, answer, now=None):
+    question, answer = _validate(question, answer)
+    with _connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        try:
+            result = conn.execute('UPDATE flashcards SET question=?, answer=?, due_at=?, interval_days=0 WHERE id=?',
+                                  (question, answer, _now(now).isoformat(), card_id))
+        except sqlite3.IntegrityError:
+            raise ValueError('Taka fiszka już istnieje.')
+        # An edited answer must be revealed again before grading.
+        conn.execute('UPDATE flashcard_session SET revealed=0 WHERE card_id=?', (card_id,))
+        return result.rowcount > 0
+
+
+def delete_card(card_id):
+    with _connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        result = conn.execute('DELETE FROM flashcards WHERE id=?', (card_id,))
+        conn.execute('UPDATE flashcard_session SET card_id=NULL, revealed=0 WHERE card_id=?', (card_id,))
+        return result.rowcount > 0

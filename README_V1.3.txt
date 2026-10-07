@@ -52,3 +52,8 @@ Oceniasz własną odpowiedź po jej odkryciu. System nie ocenia jej przez LLM.
 Po sukcesie odstęp rośnie: 1, 2, 4... maksymalnie 60 dni; po błędzie 10 minut.
 Pytania, odpowiedzi, postęp i aktywna fiszka zapisują się lokalnie w SQLite.
 Panel pokazuje liczbę fiszek i powtórek na dziś. Moduł nie wymaga chmury.
+
+Panel fiszek: /flashcards (link Zarządzaj fiszkami na stronie głównej).
+Można dodawać, przeglądać, edytować i usuwać fiszki. Usunięcie wymaga
+potwierdzenia w przeglądarce. Edycja przywraca fiszkę do powtórki
+i wymaga ponownego odkrycia odpowiedzi przed oceną.

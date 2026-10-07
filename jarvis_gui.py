@@ -11,9 +11,9 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from skills.flashcards import stats as flashcard_stats
+from skills.flashcards import stats as flashcard_stats, list_cards, add_card, edit_card, delete_card
 from skills.core_heartbeat import core_is_online
 from skills.conversation_history import recent_turns
 from skills.focus import current_focus
@@ -80,73 +80,8 @@ def cached(
     )
 
 
-def cached_background(
-    name,
-    ttl,
-    function,
-    default=None,
-):
-    """
-    Zwraca ostatnią wartość od razu i odświeża ją w tle.
-
-    Dzięki temu wolne źródła (pogoda, GTFS, kalendarz, Bluetooth)
-    nie blokują całego /api/status ani pierwszego renderu GUI.
-    """
-    now = time.monotonic()
-
-    with cache_lock:
-        old = cache.get(
-            name
-        )
-
-        if (
-            old
-            and now - old["time"] < ttl
-        ):
-            return old["value"]
-
-        should_refresh = (
-            name not in cache_refreshing
-        )
-
-        if should_refresh:
-            cache_refreshing.add(
-                name
-            )
-
-    if should_refresh:
-        def worker():
-            try:
-                value = function()
-
-                with cache_lock:
-                    cache[name] = {
-                        "time": time.monotonic(),
-                        "value": value,
-                    }
-
-            except Exception as exc:
-                print(
-                    f"[GUI ASYNC {name}] {exc}",
-                    flush=True,
-                )
-
-            finally:
-                with cache_lock:
-                    cache_refreshing.discard(
-                        name
-                    )
-
-        threading.Thread(
-            target=worker,
-            name=f"jarvis-gui-{name}",
-            daemon=True,
-        ).start()
-
-    if old:
-        return old["value"]
-
-    return default
+def cached_background(name, ttl, function, default=None):
+    return status_cache.get(name, ttl, function, default=default)
 
 
 def jarvis_state():
@@ -638,3 +573,44 @@ def status():
         ),
         "cache": status_cache.state(),
     }
+
+
+class FlashcardRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    answer: str = Field(min_length=1, max_length=4000)
+
+
+@app.get("/flashcards")
+def flashcards_page():
+    return HTMLResponse((HTML_FILE.parent / "flashcards.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/flashcards")
+def flashcard_list():
+    return {"cards": list_cards()}
+
+
+@app.post("/api/flashcards")
+def flashcard_create(request: FlashcardRequest):
+    try:
+        return {"id": add_card(request.question, request.answer)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/flashcards/{card_id}")
+def flashcard_edit(card_id: int, request: FlashcardRequest):
+    try:
+        found = edit_card(card_id, request.question, request.answer)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not found:
+        raise HTTPException(status_code=404, detail="Nie znaleziono fiszki.")
+    return {"ok": True}
+
+
+@app.delete("/api/flashcards/{card_id}")
+def flashcard_delete(card_id: int):
+    if not delete_card(card_id):
+        raise HTTPException(status_code=404, detail="Nie znaleziono fiszki.")
+    return {"ok": True}
