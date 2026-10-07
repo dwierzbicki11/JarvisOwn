@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from skills.core_heartbeat import core_is_online
 from skills.conversation_history import recent_turns
 from skills.focus import current_focus
 from skills.audio_manager import bluetooth_battery
@@ -177,8 +178,7 @@ def jarvis_state():
         )
 
         if (
-            updated
-            and time.time() - updated > 45
+            not core_is_online(STATE_FILE.with_name("heartbeat.json"), updated)
         ):
             data["state"] = "offline"
 

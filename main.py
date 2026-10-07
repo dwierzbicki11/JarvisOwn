@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from piper import PiperVoice
 
+from skills.core_heartbeat import CoreHeartbeat
 from skills.background_events import BackgroundEvents
 from skills.conversation_history import (
     append_turn,
@@ -2627,6 +2628,8 @@ def main():
     )
     last_audio_retry = 0.0
 
+    heartbeat = CoreHeartbeat(GUI_STATE_FILE.with_name("heartbeat.json"))
+    heartbeat.start()
     background_events.start()
 
     print(
@@ -2877,6 +2880,8 @@ def main():
                 )
 
     finally:
+        heartbeat.stop()
+        set_gui_state("offline")
         background_events.stop()
 
 
