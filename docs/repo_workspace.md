@@ -16,3 +16,8 @@ powinien być wystawiony przez Cloudflare dopiero z tokenem administracyjnym.
 
 Panelowe API /api/workspace/* wymaga nagłówka X-Jarvis-Workspace-Token.
 Bez JARVIS_WORKSPACE_TOKEN wszystkie endpointy warsztatu zwracają 503.
+
+Tryb pełnego workflow uruchamiają polecenia „zacznij pracę nad repozytorium
+<nazwa>” i „zakończ pracę nad repozytorium <opis>”. Druga komenda wykona testy,
+utworzy commit, wypchnie branch, a przy JARVIS_GITHUB_AUTO_MERGE=1 utworzy
+i scali PR przez GitHub API. Token GitHub jest wyłącznie w lokalnym .env.

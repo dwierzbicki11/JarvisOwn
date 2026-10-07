@@ -54,6 +54,18 @@ class RepoWorkspaceTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("sekret", result["error"])
 
+    def test_start_task_requires_clean_tree(self):
+        with patch.object(repo_workspace, "_run", return_value={"ok": True, "output": " M main.py"}):
+            result = repo_workspace.start_task("edukacja")
+        self.assertFalse(result["ok"])
+        self.assertIn("niezapisane", result["error"])
+
+    def test_auto_merge_is_opt_in(self):
+        with patch.dict(repo_workspace.os.environ, {"JARVIS_GITHUB_AUTO_MERGE": "0"}, clear=False):
+            result = repo_workspace.create_and_merge_pr("test")
+        self.assertFalse(result["ok"])
+        self.assertIn("wyłączone", result["error"])
+
 
 if __name__ == "__main__":
     unittest.main()
