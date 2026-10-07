@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from groq import Groq
 from piper import PiperVoice
 
+from skills.flashcards import process_flashcard_command
+from skills.core_heartbeat import CoreHeartbeat
 from skills.background_events import BackgroundEvents
 from skills.conversation_history import (
     append_turn,
@@ -74,7 +76,7 @@ from skills.route_planner import (
 from skills.speech_vad import record_with_speech_vad
 from skills.speech_formatter import speechify_math
 from skills.speaker_verify import profile_status as speaker_profile_status, verify_wav
-from skills.study import detect_study_subject, study_prompt
+from skills.study import detect_study_subject, study_prompt, study_control, study_style_prompt
 from skills.study_materials import (
     find_material,
     list_materials,
@@ -190,6 +192,7 @@ print("🔊 Piper gotowy.", flush=True)
 
 english_mode = False
 study_mode = None
+study_style = "kroki"
 exam_mode = False
 
 background_events = BackgroundEvents()
@@ -213,6 +216,7 @@ def set_gui_state(
     latency=None,
     speaker=None,
 ):
+    _gui_state["study_style"] = study_style
     _gui_state["study_mode"] = study_mode
     _gui_state["exam_mode"] = exam_mode
 
@@ -1262,6 +1266,7 @@ def llm_answer(text):
         system += (
             "\n\n"
             + study_prompt(subject)
+            + " " + study_style_prompt(study_style)
         )
 
     if exam_mode:
@@ -1805,9 +1810,26 @@ def process_reminder_command(
 def process_command(text):
     global english_mode
     global exam_mode
+    global study_style
 
     set_gui_state("thinking")
     lower = normalize_text(text)
+
+    flashcard_reply = process_flashcard_command(text)
+    if flashcard_reply is not None:
+        return flashcard_reply
+
+    control = study_control(text)
+    if control:
+        kind, value = control
+        if kind == "exam":
+            exam_mode = value
+            reply = "Tryb egzaminu " + ("włączony." if value else "wyłączony.")
+        else:
+            study_style = value
+            reply = "Styl nauki: " + value + "."
+        set_gui_state()
+        return reply
 
     # Naturalne odwołania do poprzedniej odpowiedzi.
     if lower in (
@@ -2163,26 +2185,6 @@ def process_command(text):
     ):
         return _set_study_mode(
             None
-        )
-
-    if "tryb egzaminu" in lower:
-        exam_mode = True
-        set_gui_state()
-
-        return (
-            "Tryb egzaminu włączony. "
-            "Będę cię sprawdzał zamiast od razu podawać odpowiedzi."
-        )
-
-    if (
-        "wyłącz tryb egzaminu" in lower
-        or "wylacz tryb egzaminu" in lower
-    ):
-        exam_mode = False
-        set_gui_state()
-
-        return (
-            "Tryb egzaminu wyłączony."
         )
 
     # Tryb językowy.
@@ -2631,6 +2633,8 @@ def main():
     )
     last_audio_retry = 0.0
 
+    heartbeat = CoreHeartbeat(GUI_STATE_FILE.with_name("heartbeat.json"))
+    heartbeat.start()
     background_events.start()
 
     print(
@@ -2881,6 +2885,8 @@ def main():
                 )
 
     finally:
+        heartbeat.stop()
+        set_gui_state("offline")
         background_events.stop()
 
 

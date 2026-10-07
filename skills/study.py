@@ -61,3 +61,33 @@ def study_prompt(subject=None):
         )
 
     return base
+
+
+STUDY_STYLES = {
+    "kroki": "Wyjaśniaj krok po kroku i sprawdzaj zrozumienie.",
+    "naprowadzanie": "Nie zdradzaj wyniku. Podaj jedną wskazówkę i poczekaj na odpowiedź użytkownika.",
+    "quiz": "Zadaj jedno pytanie naraz. Poczekaj na odpowiedź, oceń ją i wyjaśnij błędy przed kolejnym pytaniem.",
+}
+
+
+def study_control(text):
+    """Exact controls prevent a disable command from matching enable."""
+    import re
+    import unicodedata
+    text = unicodedata.normalize("NFKD", text.lower().replace("ł", "l"))
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"\s+", " ", text).strip().rstrip(".!?")
+    return {
+        "tryb egzaminu": ("exam", True),
+        "wlacz tryb egzaminu": ("exam", True),
+        "wylacz tryb egzaminu": ("exam", False),
+        "koniec egzaminu": ("exam", False),
+        "tylko naprowadzaj": ("style", "naprowadzanie"),
+        "nie podawaj wyniku": ("style", "naprowadzanie"),
+        "tryb quizu": ("style", "quiz"),
+        "wyjasniaj krok po kroku": ("style", "kroki"),
+    }.get(text)
+
+
+def study_style_prompt(style):
+    return STUDY_STYLES.get(style, STUDY_STYLES["kroki"])

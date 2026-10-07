@@ -32,3 +32,28 @@ Przykłady:
 Ważne:
 RPi jest obecnie na Wi-Fi 5 GHz, co ogranicza konflikt z Bluetooth 2.4 GHz.
 Dla HFP/mSBC nie przełączaj Budsów na A2DP, jeśli chcesz używać ich mikrofonu.
+
+Aktualizacja 2026-10-07: komendy nauki
+- tylko naprowadzaj / nie podawaj wyniku
+- tryb quizu (jedno pytanie naraz)
+- wyjaśniaj krok po kroku
+- włącz tryb egzaminu / wyłącz tryb egzaminu / koniec egzaminu
+Styl obowiązuje w rozmowie modelowej przy rozpoznanym lub wybranym przedmiocie.
+Tryb egzaminu ma pierwszeństwo nad stylem krok po kroku.
+
+Fiszki offline (2026-10-07)
+Polecenia głosowe lub wpisane w panelu:
+- dodaj fiszkę ile to dwa plus dwa odpowiedź cztery
+- powtórka fiszek / następna fiszka
+- pokaż odpowiedź fiszki
+- fiszka pamiętam / fiszka nie pamiętam
+- status fiszek / koniec fiszek
+Oceniasz własną odpowiedź po jej odkryciu. System nie ocenia jej przez LLM.
+Po sukcesie odstęp rośnie: 1, 2, 4... maksymalnie 60 dni; po błędzie 10 minut.
+Pytania, odpowiedzi, postęp i aktywna fiszka zapisują się lokalnie w SQLite.
+Panel pokazuje liczbę fiszek i powtórek na dziś. Moduł nie wymaga chmury.
+
+Panel fiszek: /flashcards (link Zarządzaj fiszkami na stronie głównej).
+Można dodawać, przeglądać, edytować i usuwać fiszki. Usunięcie wymaga
+potwierdzenia w przeglądarce. Edycja przywraca fiszkę do powtórki
+i wymaga ponownego odkrycia odpowiedzi przed oceną.
