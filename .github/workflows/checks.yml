@@ -22,7 +22,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install             python-dotenv             requests             icalendar             recurring-ical-events             psutil             fastapi             httpx             gtfs-realtime-bindings
+          python -m pip install             python-dotenv             requests             icalendar             recurring-ical-events             psutil             fastapi             httpx             gtfs-realtime-bindings             numpy             pandas
 
       - name: Compile Python sources
         run: |

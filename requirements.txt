@@ -11,3 +11,4 @@ uvicorn
 webrtcvad-wheels
 openwakeword
 numpy
+pandas
