@@ -30,6 +30,7 @@ from skills.study_rag import index_status as study_index_status
 from skills.tasks import pending_tasks
 from skills.web_commands import submit_command
 from skills import repo_workspace
+from skills import user_learning
 
 BASE_DIR = Path.home() / "jarvis"
 load_dotenv(BASE_DIR / ".env")
@@ -511,6 +512,19 @@ def command(request: CommandRequest):
 def workspace_status(request: Request):
     require_workspace_token(request)
     return repo_workspace.status()
+
+
+@app.get("/api/learning/profile")
+def learning_profile(request: Request):
+    require_workspace_token(request)
+    return user_learning.profile()
+
+
+@app.delete("/api/learning/profile")
+def learning_clear(request: Request):
+    require_workspace_token(request)
+    user_learning.clear()
+    return {"ok": True}
 
 
 @app.get("/api/workspace/branches")
