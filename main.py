@@ -84,6 +84,7 @@ from skills.study_materials import (
     material_for_prompt,
     search_materials,
 )
+from skills.study_progress import format_summary, record_interaction
 from skills.study_rag import (
     build_context,
     index_status as study_index_status,
@@ -1261,6 +1262,9 @@ def llm_answer(text):
         or detect_study_subject(text)
     )
 
+    if subject:
+        record_interaction(subject)
+
     system = SYSTEM_PROMPT
 
     if subject:
@@ -1831,6 +1835,18 @@ def process_command(text):
 
     set_gui_state("thinking")
     lower = normalize_text(text)
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "status nauki",
+            "postęp w nauce",
+            "postep w nauce",
+            "ile się uczyłem",
+            "ile sie uczylem",
+        )
+    ):
+        return format_summary()
 
     flashcard_reply = process_flashcard_command(text)
     if flashcard_reply is not None:
