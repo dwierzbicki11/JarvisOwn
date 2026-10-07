@@ -1,4 +1,5 @@
 import json
+import hmac
 import os
 import subprocess
 import threading
@@ -9,7 +10,7 @@ from pathlib import Path
 import psutil
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,7 @@ from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
 from skills.tasks import pending_tasks
 from skills.web_commands import submit_command
+from skills import repo_workspace
 
 BASE_DIR = Path.home() / "jarvis"
 load_dotenv(BASE_DIR / ".env")
@@ -64,6 +66,26 @@ status_cache = BackgroundCache()
 
 class CommandRequest(BaseModel):
     text: str
+
+
+class WorkspaceBranchRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class WorkspaceFileRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=400)
+    content: str = Field(max_length=200000)
+
+
+WORKSPACE_TOKEN = os.getenv("JARVIS_WORKSPACE_TOKEN", "").strip()
+
+
+def require_workspace_token(request):
+    if not WORKSPACE_TOKEN:
+        raise HTTPException(status_code=503, detail="Warsztat repozytorium jest wyłączony: ustaw JARVIS_WORKSPACE_TOKEN.")
+    supplied = request.headers.get("X-Jarvis-Workspace-Token", "")
+    if not hmac.compare_digest(supplied, WORKSPACE_TOKEN):
+        raise HTTPException(status_code=401, detail="Nieprawidłowy token warsztatu.")
 
 
 def cached(
@@ -479,6 +501,48 @@ def command(request: CommandRequest):
         "id": command_id,
         "text": text,
     }
+
+
+@app.get("/api/workspace/status")
+def workspace_status(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.status()
+
+
+@app.get("/api/workspace/branches")
+def workspace_branches(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.branches()
+
+
+@app.get("/api/workspace/diff")
+def workspace_diff(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.diff()
+
+
+@app.post("/api/workspace/branch")
+def workspace_branch(request: Request, payload: WorkspaceBranchRequest):
+    require_workspace_token(request)
+    return repo_workspace.create_branch(payload.name)
+
+
+@app.post("/api/workspace/test")
+def workspace_test(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.run_tests()
+
+
+@app.put("/api/workspace/file")
+def workspace_file(request: Request, payload: WorkspaceFileRequest):
+    require_workspace_token(request)
+    return repo_workspace.write_file(payload.path, payload.content)
+
+
+@app.post("/api/workspace/push")
+def workspace_push(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.push_branch()
 
 
 @app.get("/api/status")
