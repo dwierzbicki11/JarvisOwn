@@ -66,6 +66,13 @@ class RepoWorkspaceTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("wyłączone", result["error"])
 
+    def test_ci_wait_rejects_failed_workflow(self):
+        response = {"ok": True, "data": {"workflow_runs": [{"head_sha": "abc", "status": "completed", "conclusion": "failure"}]}}
+        with patch.object(repo_workspace, "_github_request", return_value=response):
+            result = repo_workspace._wait_for_ci("owner/repo", "abc")
+        self.assertFalse(result["ok"])
+        self.assertIn("niescalony", result["error"])
+
 
 if __name__ == "__main__":
     unittest.main()
