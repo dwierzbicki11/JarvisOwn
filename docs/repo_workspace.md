@@ -13,3 +13,6 @@ Gałęzie main i master są chronione. Nazwy tworzone przez JARVIS-a dostają
 prefiks jarvis/. Operacje używają argumentów procesu, bez shell=True.
 Edycja plików jest dostępna przez funkcję lokalnego modułu; panel zapisu
 powinien być wystawiony przez Cloudflare dopiero z tokenem administracyjnym.
+
+Panelowe API /api/workspace/* wymaga nagłówka X-Jarvis-Workspace-Token.
+Bez JARVIS_WORKSPACE_TOKEN wszystkie endpointy warsztatu zwracają 503.

@@ -7,6 +7,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 import jarvis_gui as gui
 from skills import flashcards
+from skills import repo_workspace
 
 
 class GuiApiTests(unittest.TestCase):
@@ -61,3 +62,17 @@ class GuiApiTests(unittest.TestCase):
             response = self.client.get('/flashcards')
         self.assertEqual(response.status_code, 200)
         self.assertIn('Twoje fiszki', response.text)
+
+    def test_workspace_requires_token_and_supports_edit(self):
+        denied = self.client.get('/api/workspace/status')
+        self.assertIn(denied.status_code, (401, 503))
+        with patch.object(gui, 'WORKSPACE_TOKEN', 'secret'), patch.object(
+            repo_workspace, 'write_file', return_value={'ok': True, 'path': 'main.py'}
+        ) as write:
+            response = self.client.put(
+                '/api/workspace/file',
+                headers={'X-Jarvis-Workspace-Token': 'secret'},
+                json={'path': 'main.py', 'content': 'print(1)'},
+            )
+        self.assertEqual(response.status_code, 200)
+        write.assert_called_once_with('main.py', 'print(1)')
