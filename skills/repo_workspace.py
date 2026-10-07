@@ -69,6 +69,52 @@ def diff():
     return _run(["git", "diff", "--", "."])
 
 
+def log():
+    return _run(["git", "log", "-5", "--oneline", "--decorate"])
+
+
+def _secret_scan():
+    repo = repository_path()
+    if repo is None:
+        return "Nie znaleziono repozytorium."
+    listing = subprocess.run(["git", "status", "--porcelain"], cwd=repo, text=True, capture_output=True, check=False)
+    for line in listing.stdout.splitlines():
+        relative = line[3:].strip().strip('"')
+        if not relative or relative == "deleted":
+            continue
+        path = repo / relative
+        if path.name in {".env", ".env.local", "id_rsa"} or path.suffix in {".pem", ".key"}:
+            return f"Plik {relative} wygląda na sekret i nie zostanie dodany."
+        if path.is_file() and path.stat().st_size <= 300000:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+            if any(marker in content for marker in ("GROQ_API_KEY=", "github_pat_", "ghp_", "BEGIN PRIVATE KEY")):
+                return f"Plik {relative} zawiera wzorzec sekretu i nie zostanie dodany."
+    return None
+
+
+def commit_changes(message):
+    message = (message or "").strip()
+    if not message or len(message) > 120 or "\n" in message:
+        return {"ok": False, "error": "Podaj jednozdaniowy opis zmiany do 120 znaków."}
+    current = _run(["git", "branch", "--show-current"])
+    branch = current.get("output", "").strip()
+    if not branch or branch in {"main", "master"}:
+        return {"ok": False, "error": "Commit z main/master jest zablokowany. Utwórz gałąź jarvis/*."}
+    secret = _secret_scan()
+    if secret:
+        return {"ok": False, "error": secret}
+    tests = run_tests()
+    if not tests["ok"]:
+        return {"ok": False, "error": "Commit zatrzymany: testy nie przeszły.", "tests": tests}
+    staged = _run(["git", "add", "-A"])
+    if not staged["ok"]:
+        return {"ok": False, "error": staged.get("output", "Nie udało się przygotować zmian.")}
+    committed = _run(["git", "commit", "-m", message])
+    if not committed["ok"]:
+        return {"ok": False, "error": committed.get("output", "Nie udało się utworzyć commita.")}
+    return {"ok": True, "branch": branch, "output": committed.get("output", "")}
+
+
 def run_tests():
     compile_result = _run(["python", "-m", "compileall", "-q", "main.py", "jarvis_gui.py", "skills", "tests"], timeout=90)
     if not compile_result["ok"]:
@@ -121,6 +167,12 @@ def process_repo_command(text):
     if any(marker in lower for marker in ("status repo", "status github", "stan repo")):
         result = status()
         return result.get("output") if result["ok"] else result["error"]
+    if "log repo" in lower or "historia repo" in lower:
+        result = log()
+        return result.get("output") if result["ok"] else result["error"]
+    if "doctor repo" in lower or "sprawdź repo" in lower or "sprawdz repo" in lower:
+        result = run_tests()
+        return "Repozytorium przeszło diagnostykę." if result["ok"] else f"Diagnostyka nie przeszła: {result.get('output') or result.get('error', 'błąd')}"
     if any(marker in lower for marker in ("branch repo", "gałęzie repo", "galazie repo")):
         result = branches()
         return "Gałęzie: " + ", ".join(result.get("branches", [])) if result["ok"] else result["error"]
@@ -134,4 +186,8 @@ def process_repo_command(text):
     if "wypchnij branch" in lower or "push branch" in lower:
         result = push_branch()
         return "Wypchnąłem bieżącą gałąź." if result["ok"] else result["error"]
+    match = re.search(r"(?:zatwierdź|zatwierdz|commit)\s+(?:zmiany\s+)?repo(?:zytorium)?\s+(.+)$", lower)
+    if match:
+        result = commit_changes(match.group(1))
+        return "Zmiany zatwierdzone po przejściu testów." if result["ok"] else result["error"]
     return "Mogę pokazać status, gałęzie, diff albo uruchomić lokalne testy repozytorium."

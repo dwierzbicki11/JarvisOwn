@@ -77,6 +77,10 @@ class WorkspaceFileRequest(BaseModel):
     content: str = Field(max_length=200000)
 
 
+class WorkspaceCommitRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=120)
+
+
 WORKSPACE_TOKEN = os.getenv("JARVIS_WORKSPACE_TOKEN", "").strip()
 
 
@@ -531,6 +535,24 @@ def workspace_branch(request: Request, payload: WorkspaceBranchRequest):
 def workspace_test(request: Request):
     require_workspace_token(request)
     return repo_workspace.run_tests()
+
+
+@app.get("/api/workspace/log")
+def workspace_log(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.log()
+
+
+@app.post("/api/workspace/doctor")
+def workspace_doctor(request: Request):
+    require_workspace_token(request)
+    return repo_workspace.run_tests()
+
+
+@app.post("/api/workspace/commit")
+def workspace_commit(request: Request, payload: WorkspaceCommitRequest):
+    require_workspace_token(request)
+    return repo_workspace.commit_changes(payload.message)
 
 
 @app.put("/api/workspace/file")
