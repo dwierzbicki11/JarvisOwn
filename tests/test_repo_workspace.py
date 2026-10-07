@@ -30,6 +30,30 @@ class RepoWorkspaceTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("wyłączony", result["error"])
 
+    def test_commit_is_blocked_on_main(self):
+        with patch.object(repo_workspace, "_run", return_value={"ok": True, "output": "main"}):
+            result = repo_workspace.commit_changes("nie zmieniaj main")
+        self.assertFalse(result["ok"])
+        self.assertIn("main/master", result["error"])
+
+    def test_secret_scan_blocks_env(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / ".git").mkdir()
+            (repo / ".env").write_text("GROQ_API_KEY=secret")
+            with patch.object(repo_workspace, "repository_path", return_value=repo), patch.object(
+                repo_workspace, "_run", side_effect=[
+                    {"ok": True, "output": "jarvis/test"},
+                    {"ok": True, "output": ""},
+                ]
+            ), patch.object(
+                repo_workspace.subprocess, "run",
+                return_value=type("Result", (), {"stdout": "?? .env\n"})(),
+            ):
+                result = repo_workspace.commit_changes("bez sekretu")
+        self.assertFalse(result["ok"])
+        self.assertIn("sekret", result["error"])
+
 
 if __name__ == "__main__":
     unittest.main()
