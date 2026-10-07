@@ -175,7 +175,7 @@ br{line-height:.55}
     <div class="chat-label">HISTORIA ROZMOWY</div>
     <div id="conversation-history" class="small">Brak historii.</div>
   </div>
-<form class="command-form" id="command-form"><input class="command-input" id="command-input" placeholder="Wpisz polecenie dla JARVIS-a..." autocomplete="off"><button class="command-button" type="submit">WYŚLIJ</button></form>
+<form class="command-form" id="command-form"><textarea class="command-input" id="command-input" rows="1" aria-label="Polecenie lub kod dla JARVIS-a" placeholder="Polecenie lub kod — Shift+Enter: nowa linia" autocomplete="off"></textarea><button class="command-button" type="submit">WYŚLIJ</button></form>
 </div>
 
 <script>
@@ -453,6 +453,12 @@ async function update(){
 }
 
 
+document.getElementById("command-input").addEventListener("keydown",event=>{
+  if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
+    event.preventDefault();
+    document.getElementById("command-form").requestSubmit();
+  }
+});
 document.getElementById("command-form").addEventListener("submit",async(event)=>{
   event.preventDefault();
 
