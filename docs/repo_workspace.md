@@ -21,3 +21,5 @@ Tryb pełnego workflow uruchamiają polecenia „zacznij pracę nad repozytorium
 <nazwa>” i „zakończ pracę nad repozytorium <opis>”. Druga komenda wykona testy,
 utworzy commit, wypchnie branch, a przy JARVIS_GITHUB_AUTO_MERGE=1 utworzy
 i scali PR przez GitHub API. Token GitHub jest wyłącznie w lokalnym .env.
+Przed scaleniem JARVIS czeka na GitHub Actions; błąd lub timeout pozostawia
+PR otwarty i nie zmienia main.

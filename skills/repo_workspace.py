@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import tempfile
+import time
 from urllib.request import Request, urlopen
 from pathlib import Path
 
@@ -202,6 +203,25 @@ def _github_request(method, url, payload=None):
         return {"ok": False, "error": f"GitHub API: {exc}"}
 
 
+def _wait_for_ci(repo, sha):
+    timeout = max(30, int(os.getenv("JARVIS_CI_TIMEOUT_SECONDS", "900")))
+    interval = max(3, int(os.getenv("JARVIS_CI_POLL_SECONDS", "10")))
+    deadline = time.monotonic() + timeout
+    url = f"https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=10"
+    while time.monotonic() < deadline:
+        result = _github_request("GET", url)
+        if not result["ok"]:
+            return result
+        runs = result["data"].get("workflow_runs", [])
+        matching = [run for run in runs if run.get("head_sha") == sha]
+        if matching and all(run.get("status") == "completed" for run in matching):
+            if all(run.get("conclusion") == "success" for run in matching):
+                return {"ok": True, "output": "GitHub Actions zakończone sukcesem."}
+            return {"ok": False, "error": "GitHub Actions zakończyły się błędem. PR pozostaje niescalony."}
+        time.sleep(interval)
+    return {"ok": False, "error": "Przekroczono czas oczekiwania na GitHub Actions. PR pozostaje niescalony."}
+
+
 def create_and_merge_pr(message):
     if os.getenv("JARVIS_GITHUB_AUTO_MERGE", "0") != "1":
         return {"ok": False, "error": "Automatyczne scalanie jest wyłączone. Ustaw JARVIS_GITHUB_AUTO_MERGE=1."}
@@ -219,6 +239,10 @@ def create_and_merge_pr(message):
     if not created["ok"]:
         return created
     number = created["data"].get("number")
+    head_sha = _run(["git", "rev-parse", "HEAD"]).get("output", "").strip()
+    ci = _wait_for_ci(repo, head_sha)
+    if not ci["ok"]:
+        return {"ok": False, "number": number, "error": ci["error"]}
     merged = _github_request("PUT", f"https://api.github.com/repos/{repo}/pulls/{number}/merge", {
         "merge_method": "squash",
         "commit_title": message,
