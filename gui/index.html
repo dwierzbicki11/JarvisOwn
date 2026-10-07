@@ -92,7 +92,7 @@ br{line-height:.55}
       <div class="normal" id="class-name">Pobieranie planu...</div>
       <div class="normal" id="class-location"></div>
       <br>
-      <div class="small" id="study-index">Materiały: --</div>
+      <div class="small" id="study-index">Materiały: --</div><div class="small" id="flashcard-status">Fiszki: --</div>
     </div>
   </div>
 
@@ -327,6 +327,8 @@ async function update(){
       document.getElementById("class-location").textContent="";
     }
 
+    const cards=data.flashcards||{};
+    document.getElementById("flashcard-status").textContent=`Fiszki: ${cards.total??0} • do powtórki: ${cards.due??0}`;
     const study=data.study||{};
     document.getElementById("study-index").textContent=
       study.error

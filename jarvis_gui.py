@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from skills.flashcards import stats as flashcard_stats
 from skills.core_heartbeat import core_is_online
 from skills.conversation_history import recent_turns
 from skills.focus import current_focus
@@ -515,6 +516,11 @@ def health():
     }
 
 
+@app.get("/api/flashcards/status")
+def flashcards_status():
+    return flashcard_stats()
+
+
 @app.post("/api/command")
 def command(request: CommandRequest):
     text = request.text.strip()
@@ -614,6 +620,7 @@ def status():
                 "pihole": pihole_data(),
             },
         ),
+        "flashcards": cached_background("flashcards", 5, flashcard_stats, default={}),
         "study": cached_background(
             "study",
             30,

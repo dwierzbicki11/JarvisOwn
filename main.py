@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from piper import PiperVoice
 
+from skills.flashcards import process_flashcard_command
 from skills.core_heartbeat import CoreHeartbeat
 from skills.background_events import BackgroundEvents
 from skills.conversation_history import (
@@ -1813,6 +1814,10 @@ def process_command(text):
 
     set_gui_state("thinking")
     lower = normalize_text(text)
+
+    flashcard_reply = process_flashcard_command(text)
+    if flashcard_reply is not None:
+        return flashcard_reply
 
     control = study_control(text)
     if control:
