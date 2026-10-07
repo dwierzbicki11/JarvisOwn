@@ -1,8 +1,10 @@
 """Guarded local Git workspace for JARVIS development tasks."""
 import os
+import json
 import re
 import subprocess
 import tempfile
+from urllib.request import Request, urlopen
 from pathlib import Path
 
 BASE_DIR = Path.home() / "jarvis"
@@ -157,6 +159,87 @@ def push_branch():
     return _run(["git", "push", "--set-upstream", "origin", branch], timeout=120)
 
 
+def start_task(name):
+    """Start an isolated Jarvis task branch."""
+    try:
+        branch = _safe_branch(name)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    current = _run(["git", "status", "--porcelain"])
+    if not current["ok"]:
+        return current
+    if current.get("output"):
+        return {"ok": False, "error": "Repozytorium ma niezapisane zmiany. Najpierw je zatwierdź albo wyczyść."}
+    return _run(["git", "switch", "-c", branch])
+
+
+def _github_repo():
+    configured = os.getenv("JARVIS_GITHUB_REPO", "").strip()
+    if configured:
+        return configured
+    remote = _run(["git", "remote", "get-url", "origin"])
+    value = remote.get("output", "").strip().removesuffix(".git")
+    match = re.search(r"github\.com[:/]([^/]+/[^/]+)$", value)
+    return match.group(1) if match else ""
+
+
+def _github_request(method, url, payload=None):
+    token = os.getenv("JARVIS_GITHUB_TOKEN", "").strip()
+    if not token:
+        return {"ok": False, "error": "Brak JARVIS_GITHUB_TOKEN."}
+    body = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = Request(url, data=body, method=method, headers={
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "User-Agent": "JARVIS-repo-workflow",
+    })
+    try:
+        with urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        return {"ok": True, "data": data}
+    except Exception as exc:
+        return {"ok": False, "error": f"GitHub API: {exc}"}
+
+
+def create_and_merge_pr(message):
+    if os.getenv("JARVIS_GITHUB_AUTO_MERGE", "0") != "1":
+        return {"ok": False, "error": "Automatyczne scalanie jest wyłączone. Ustaw JARVIS_GITHUB_AUTO_MERGE=1."}
+    repo = _github_repo()
+    branch = _run(["git", "branch", "--show-current"]).get("output", "").strip()
+    if not repo or not branch or branch in {"main", "master"}:
+        return {"ok": False, "error": "Brak repozytorium GitHub albo trwa praca na chronionej gałęzi."}
+    base = os.getenv("JARVIS_GITHUB_BASE", "main")
+    created = _github_request("POST", f"https://api.github.com/repos/{repo}/pulls", {
+        "title": message,
+        "head": branch,
+        "base": base,
+        "body": "PR utworzony przez JARVIS-a po przejściu lokalnych testów.",
+    })
+    if not created["ok"]:
+        return created
+    number = created["data"].get("number")
+    merged = _github_request("PUT", f"https://api.github.com/repos/{repo}/pulls/{number}/merge", {
+        "merge_method": "squash",
+        "commit_title": message,
+    })
+    if merged["ok"] and merged["data"].get("merged"):
+        return {"ok": True, "number": number, "output": "PR scalony do main."}
+    return {"ok": False, "number": number, "error": "PR utworzony, ale GitHub nie scalił go automatycznie.", "details": merged}
+
+
+def finish_task(message):
+    committed = commit_changes(message)
+    if not committed["ok"]:
+        return committed
+    pushed = push_branch()
+    if not pushed["ok"]:
+        return {"ok": False, "error": "Commit utworzony, ale push nie powiódł się.", "details": pushed}
+    if os.getenv("JARVIS_GITHUB_AUTO_MERGE", "0") == "1":
+        return create_and_merge_pr(message)
+    return {"ok": True, "output": "Commit i push zakończone. Auto-merge jest wyłączony."}
+
+
 def process_repo_command(text):
     lower = (text or "").strip().lower()
     if not any(marker in lower for marker in ("repo", "github", "gałąź", "galaz", "branch")):
@@ -186,6 +269,14 @@ def process_repo_command(text):
     if "wypchnij branch" in lower or "push branch" in lower:
         result = push_branch()
         return "Wypchnąłem bieżącą gałąź." if result["ok"] else result["error"]
+    match = re.search(r"(?:zacznij|rozpocznij) pracę nad repo(?:zytorium)?\s+(.+)$", lower)
+    if match:
+        result = start_task(match.group(1))
+        return "Utworzyłem izolowaną gałąź pracy." if result["ok"] else result["error"]
+    match = re.search(r"(?:zakończ|zakoncz) pracę nad repo(?:zytorium)?\s+(.+)$", lower)
+    if match:
+        result = finish_task(match.group(1))
+        return result.get("output") if result["ok"] else result.get("error", "Workflow repozytorium nie powiódł się.")
     match = re.search(r"(?:zatwierdź|zatwierdz|commit)\s+(?:zmiany\s+)?repo(?:zytorium)?\s+(.+)$", lower)
     if match:
         result = commit_changes(match.group(1))
