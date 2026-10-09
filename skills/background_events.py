@@ -148,6 +148,7 @@ class BackgroundEvents:
                         self.queue.put(
                             {
                                 "type": "web_command",
+                                "command_id": command["id"],
                                 "text": command["text"],
                             }
                         )

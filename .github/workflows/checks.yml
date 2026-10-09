@@ -31,3 +31,21 @@ jobs:
       - name: Unit tests
         run: |
           python -m unittest discover -v tests
+
+  study-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Browser test dependencies
+        run: |
+          npm install --prefix /tmp/jarvis-ui-runtime --no-save --ignore-scripts playwright@1.51.1
+          node /tmp/jarvis-ui-runtime/node_modules/playwright/cli.js install --with-deps chromium --only-shell
+      - name: Tutoring panel regression
+        env:
+          NODE_PATH: /tmp/jarvis-ui-runtime/node_modules
+        run: node tests/study_ui.cjs

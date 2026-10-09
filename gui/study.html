@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Korepetytor — JARVIS</title>
+  <style>
+    :root{color-scheme:dark}*{box-sizing:border-box}
+    body{font:16px/1.55 system-ui;background:#071821;color:#e0f5ff;max-width:960px;margin:auto;padding:24px}
+    a{color:#7de9ff}h1{margin-bottom:4px}h2{font-size:22px;margin-top:0}
+    section{background:#102d3b;padding:24px;border:1px solid #264955;border-radius:14px;margin:22px 0}
+    label{display:block;margin:12px 0}input,select,textarea{font:inherit;color:inherit;background:#071821;border:1px solid #58747e;border-radius:6px;padding:10px;width:100%}
+    textarea{resize:vertical}button{font:inherit;cursor:pointer;padding:10px 16px;margin:6px 6px 0 0;border:1px solid #8de7fa;border-radius:6px;background:#8de7fa;color:#071821}
+    button.secondary{color:#c6f4ff;background:transparent}button:disabled{opacity:.4;cursor:default}
+    :focus-visible{outline:3px solid #fff;outline-offset:3px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .muted{color:#acc5cf;font-size:14px}.preserve{white-space:pre-wrap;overflow-wrap:anywhere}
+    #question{font-size:21px}#notice{min-height:24px;color:#a9e9ff}#history{padding-left:24px}#history li{padding:8px 0}
+    [hidden]{display:none!important}@media(max-width:620px){body{padding:16px}.grid{grid-template-columns:1fr;gap:0}section{padding:18px}}
+  </style>
+</head>
+<body>
+  <a href="/">← Panel JARVIS</a>
+  <h1>Korepetytor</h1>
+  <p>Jedno pytanie naraz. Wróć do swojej sesji wtedy, kiedy masz czas.</p>
+  <p class="muted">Postęp zapisuje się na Twoim urządzeniu. Zadania i oceny tworzy model AI — mogą wymagać sprawdzenia.</p>
+  <p id="notice" class="preserve" role="status" aria-live="polite">Wczytuję sesję…</p>
+  <section id="new-session">
+    <h2>Rozpocznij naukę</h2>
+    <form id="start-form">
+      <div class="grid">
+        <label>Przedmiot<select id="subject"><option value="matematyka">Matematyka</option><option value="programowanie">Programowanie</option><option value="angielski">Angielski</option></select></label>
+        <label>Tryb<select id="mode"><option value="quiz">Quiz</option><option value="kroki">Krok po kroku</option><option value="naprowadzanie">Naprowadzanie</option></select></label>
+        <label>Poziom<select id="level"><option value="podstawowy">Podstawowy</option><option value="średni">Średni</option><option value="zaawansowany">Zaawansowany</option></select></label>
+      </div>
+      <label>Co chcesz przećwiczyć? <span class="muted">(opcjonalnie)</span><input id="goal" maxlength="500" placeholder="Np. pochodne, pętle w Pythonie lub Present Perfect"></label>
+      <button id="start" disabled>Rozpocznij sesję</button>
+    </form>
+  </section>
+  <section id="session" hidden>
+    <h2 id="session-title"></h2>
+    <p id="session-meta" class="muted"></p>
+    <p id="session-goal" class="preserve"></p>
+    <p id="score"></p>
+    <p id="question" class="preserve"></p>
+    <p id="feedback" class="preserve"></p>
+    <form id="answer-form">
+      <label>Twoja odpowiedź<textarea id="answer" rows="5" required maxlength="6000" placeholder="Wpisz odpowiedź lub wklej fragment kodu. Kod nie jest uruchamiany."></textarea></label>
+      <button id="send-answer" disabled>Sprawdź odpowiedź</button>
+    </form>
+    <div>
+      <button id="hint" class="secondary" data-command="podpowiedź w sesji" disabled>Podpowiedź</button>
+      <button id="skip" class="secondary" data-command="pomiń pytanie w sesji" disabled>Pomiń pytanie</button>
+      <button id="next" data-command="następne pytanie w sesji" disabled>Następne pytanie</button>
+    </div>
+    <div>
+      <button id="pause" class="secondary" data-command="pauza sesji nauki" disabled>Pauza</button>
+      <button id="resume" data-command="wznów sesję nauki" disabled>Wznów</button>
+      <button id="stop" class="secondary" data-command="koniec sesji nauki" disabled>Zakończ sesję</button>
+    </div>
+  </section>
+  <section><h2>Ostatnie sesje</h2><ul id="history"><li>Brak zapisanych sesji.</li></ul></section>
+  <script>
+    const byId = id => document.getElementById(id);
+    const states = {active: 'aktywna', paused: 'wstrzymana', finished: 'zakończona'};
+    let session = null, loaded = false, sending = false, pending = null, polling = false;
+    // Keep the receipt across page reloads; never automatically re-send a command.
+    try { pending = JSON.parse(sessionStorage.getItem('jarvis-study-command')); } catch (_) {}
+    function rememberPending(value) {
+      pending = value;
+      try {
+        if (value) sessionStorage.setItem('jarvis-study-command', JSON.stringify(value));
+        else sessionStorage.removeItem('jarvis-study-command');
+      } catch (_) {}
+    }
+    function notice(text) { byId('notice').textContent = text; }
+    async function api(url, options = {}) {
+      const response = await fetch(url, {...options, headers: {'Content-Type': 'application/json'}, signal: AbortSignal.timeout(12000)});
+      const data = await response.json();
+      if (!response.ok) throw Error(typeof data.detail === 'string' ? data.detail : 'Nie udało się pobrać danych.');
+      return data;
+    }
+    function controls() {
+      const busy = !loaded || sending || !!pending;
+      const active = session?.state === 'active', awaiting = !!session?.awaiting_answer;
+      byId('new-session').hidden = !!session;
+      byId('session').hidden = !session;
+      byId('start').disabled = busy || !!session;
+      for (const id of ['send-answer', 'hint', 'skip']) byId(id).disabled = busy || !active || !awaiting;
+      byId('answer').disabled = busy || !active || !awaiting;
+      byId('next').disabled = busy || !active || awaiting;
+      byId('pause').disabled = busy || !active;
+      byId('resume').disabled = busy || session?.state !== 'paused';
+      byId('stop').disabled = busy || !session;
+    }
+    function score(row) {
+      return `Poprawne: ${row.correct} · Częściowe: ${row.partial} · Błędne: ${row.wrong} · Podpowiedzi: ${row.hints} · Pominięte: ${row.skipped}`;
+    }
+    async function refresh() {
+      const data = await api('/api/study/session');
+      session = data.current;
+      loaded = true;
+      if (session) {
+        byId('session-title').textContent = `Sesja ${session.id} · ${session.subject}`;
+        byId('session-meta').textContent = `${states[session.state]} · ${session.level} · ${session.mode}${session.exam ? ' · tryb egzaminu' : ''}`;
+        byId('session-goal').textContent = session.goal;
+        byId('question').textContent = session.question || 'Poproś o pierwsze pytanie przyciskiem poniżej.';
+        byId('feedback').textContent = session.feedback;
+        byId('score').textContent = score(session);
+      }
+      const history = byId('history');
+      history.replaceChildren();
+      for (const row of data.recent) {
+        const item = document.createElement('li');
+        item.textContent = `${new Date(row.started_at).toLocaleString('pl-PL')} · ${row.subject} · ${states[row.state]} — ${score(row)}`;
+        history.append(item);
+      }
+      if (!data.recent.length) history.textContent = 'Brak zapisanych sesji.';
+      controls();
+    }
+    async function send(text, clearAnswer = false) {
+      if (sending || pending || !loaded) return;
+      sending = true;
+      controls();
+      notice('Wysyłam polecenie…');
+      try {
+        const receipt = await api('/api/command', {method: 'POST', body: JSON.stringify({text})});
+        rememberPending({id: receipt.id, sent: Date.now(), clearAnswer});
+        notice('JARVIS przygotowuje odpowiedź…');
+      } catch (_) {
+        notice('Nie udało się potwierdzić przyjęcia polecenia. Sprawdź stan sesji przed ponowieniem.');
+      } finally {
+        sending = false;
+        controls();
+      }
+    }
+    async function poll() {
+      if (polling) return;
+      polling = true;
+      try {
+        let done = null;
+        if (pending) {
+          const receipt = await api('/api/commands/' + pending.id);
+          if (receipt.state === 'done') done = receipt;
+          else if (Date.now() - pending.sent > 90000) {
+            notice('Brak potwierdzenia wykonania. Sprawdź, czy JARVIS działa. Panel nadal czeka i nie wysyła polecenia ponownie.');
+          }
+        }
+        await refresh();
+        if (done) {
+          if (pending.clearAnswer && session && !session.awaiting_answer) byId('answer').value = '';
+          rememberPending(null);
+          notice(done.answer);
+          controls();
+        } else if (!pending && byId('notice').textContent === 'Wczytuję sesję…') notice('');
+      } catch (_) {
+        notice('Nie mogę odświeżyć danych. Sprawdzam połączenie; Twoja wpisana odpowiedź pozostaje w polu.');
+      } finally {
+        polling = false;
+        setTimeout(poll, pending ? 1500 : 5000);
+      }
+    }
+    byId('start-form').onsubmit = event => {
+      event.preventDefault();
+      send(`rozpocznij sesję nauki ${byId('subject').value}; ${byId('mode').value}; ${byId('level').value}; ${byId('goal').value.trim()}`);
+    };
+    byId('answer-form').onsubmit = event => {
+      event.preventDefault();
+      const answer = byId('answer').value.trim();
+      if (answer) send('odpowiedź w sesji: ' + answer, true);
+    };
+    for (const button of document.querySelectorAll('[data-command]')) {
+      button.onclick = () => send(button.dataset.command);
+    }
+    poll();
+  </script>
+</body>
+</html>

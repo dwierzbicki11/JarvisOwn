@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 import jarvis_gui as gui
 from skills import flashcards
 from skills import repo_workspace
+from skills import study_sessions, web_commands, tutoring
 
 
 class GuiApiTests(unittest.TestCase):
@@ -16,6 +17,8 @@ class GuiApiTests(unittest.TestCase):
         self.addCleanup(self.stack.close)
         directory = self.stack.enter_context(tempfile.TemporaryDirectory())
         self.stack.enter_context(patch.object(flashcards, 'DB_PATH', Path(directory) / 'cards.db'))
+        self.stack.enter_context(patch.object(study_sessions, 'DB_PATH', Path(directory) / 'study.db'))
+        self.stack.enter_context(patch.object(web_commands, 'DB_PATH', Path(directory) / 'commands.db'))
         # Do not start background hardware/network jobs in HTTP contract tests.
         self.client = TestClient(gui.app)
         self.addCleanup(self.client.close)
@@ -62,6 +65,38 @@ class GuiApiTests(unittest.TestCase):
             response = self.client.get('/flashcards')
         self.assertEqual(response.status_code, 200)
         self.assertIn('Twoje fiszki', response.text)
+
+    def test_study_page_and_persisted_status(self):
+        with patch.object(gui, 'HTML_FILE', Path(gui.__file__).parent / 'gui' / 'index.html'):
+            response = self.client.get('/study')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Korepetytor', response.text)
+        self.assertEqual(self.client.get('/api/study/session').json(), {'current': None, 'recent': []})
+        row = study_sessions.start('matematyka')
+        status = self.client.get('/api/study/session').json()
+        self.assertEqual(status['current']['id'], row['id'])
+        self.assertEqual(status['recent'][0]['subject'], 'matematyka')
+
+    def test_study_command_roundtrip_including_model_failure(self):
+        from unittest.mock import Mock
+        model = Mock(return_value='{"feedback":"Policz", "grade":"ungraded", "question":"2 + 2?"}')
+        for text in ('rozpocznij sesję nauki matematyka', 'odpowiedź w sesji: 4'):
+            receipt = self.client.post('/api/command', json={'text': text}).json()
+            command_id = receipt['id']
+            url = f'/api/commands/{command_id}'
+            self.assertEqual(self.client.get(url).json()['state'], 'queued')
+            queued = web_commands.pop_pending_commands()
+            self.assertEqual(len(queued), 1)
+            answer = tutoring.process_command(queued[0]['text'], model)
+            web_commands.complete_command(command_id, answer)
+            self.assertEqual(self.client.get(url).json()['answer'], answer)
+            model.side_effect = TimeoutError()
+        result = self.client.get(url).json()
+        self.assertEqual(result['state'], 'done')
+        self.assertIn('niedostępny', result['answer'])
+        session = self.client.get('/api/study/session').json()['current']
+        self.assertEqual((session['correct'], session['awaiting_answer']), (0, 1))
+        self.assertEqual(self.client.get('/api/commands/9999').status_code, 404)
 
     def test_workspace_requires_token_and_supports_edit(self):
         denied = self.client.get('/api/workspace/status')

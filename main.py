@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -18,6 +19,9 @@ from piper import PiperVoice
 from skills.flashcards import process_flashcard_command
 from skills.analytics import process_analytics_command
 from skills.code_tutor import process_code_command
+from skills.tutoring import process_command as process_tutoring_command
+from skills import study_sessions
+from skills.web_commands import complete_command, recover_interrupted_commands
 from skills.repo_workspace import process_repo_command
 from skills.user_learning import context as learning_context, process_learning_command, record_query
 from skills.core_heartbeat import CoreHeartbeat
@@ -1256,6 +1260,18 @@ a nie tylko podawaj wynik.
 """
 
 
+def tutor_completion(messages):
+    # One bounded request per action; no hidden retries or background generation.
+    completion = client.with_options(timeout=45.0, max_retries=0).chat.completions.create(
+        model=CHAT_MODEL,
+        messages=messages,
+        temperature=0.2,
+        max_completion_tokens=1600,
+        response_format={"type": "json_object"},
+    )
+    return completion.choices[0].message.content
+
+
 def llm_answer(text):
     timer = perf_start(
         "Groq chat"
@@ -1842,6 +1858,15 @@ def process_command(text):
     global study_style
 
     set_gui_state("thinking")
+    # Code and tutoring answers are data, even when they contain command words.
+    code_reply = process_code_command(text)
+    if code_reply is not None:
+        return code_reply
+    tutoring_reply = process_tutoring_command(
+        text, tutor_completion, default_mode=study_style, exam=exam_mode,
+    )
+    if tutoring_reply is not None:
+        return tutoring_reply
     learning_reply = process_learning_command(text)
     if learning_reply is not None:
         return learning_reply
@@ -1855,9 +1880,6 @@ def process_command(text):
         )
         if analytics_reply is not None:
             return analytics_reply
-    code_reply = process_code_command(text)
-    if code_reply is not None:
-        return code_reply
     repo_reply = process_repo_command(text)
     if repo_reply is not None:
         return repo_reply
@@ -1882,6 +1904,10 @@ def process_command(text):
     control = study_control(text)
     if control:
         kind, value = control
+        try:
+            study_sessions.configure(**{"exam" if kind == "exam" else "mode": value})
+        except (OSError, sqlite3.Error):
+            return "Nie mogę zapisać ustawień sesji. Spróbuj ponownie."
         if kind == "exam":
             exam_mode = value
             reply = "Tryb egzaminu " + ("włączony." if value else "wyłączony.")
@@ -2647,7 +2673,17 @@ def handle_background_events():
                 last_user=text,
             )
 
-            answer = process_command(text)
+            try:
+                answer = process_command(text)
+            except Exception as exc:
+                print(f"[WEB COMMAND ERROR] {type(exc).__name__}", flush=True)
+                answer = "Nie udało się wykonać polecenia. Sprawdź stan przed ponowieniem."
+
+            if event.get("command_id") is not None:
+                try:
+                    complete_command(event["command_id"], answer)
+                except Exception as exc:
+                    print(f"[WEB RESULT ERROR] {type(exc).__name__}", flush=True)
 
             try:
                 append_turn(
@@ -2695,6 +2731,10 @@ def main():
 
     heartbeat = CoreHeartbeat(GUI_STATE_FILE.with_name("heartbeat.json"))
     heartbeat.start()
+    try:
+        recover_interrupted_commands()
+    except (OSError, sqlite3.Error) as exc:
+        print(f"[WEB RECOVERY ERROR] {type(exc).__name__}", flush=True)
     background_events.start()
 
     print(

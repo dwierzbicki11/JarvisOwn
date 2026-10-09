@@ -21,13 +21,17 @@ class StudyControlsTests(unittest.TestCase):
 class RouterIntegrationTests(unittest.TestCase):
     def test_controls_update_live_router_state(self):
         import ast
+        import sqlite3
         from pathlib import Path
+        from unittest.mock import Mock
         tree = ast.parse((Path(__file__).resolve().parents[1] / 'main.py').read_text())
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'process_command')
         env = {'english_mode': False, 'exam_mode': True, 'study_style': 'kroki',
                'set_gui_state': lambda *args: None, 'normalize_text': lambda text: text.lower(),
                'study_control': study_control, 'process_flashcard_command': lambda text: None,
                'process_code_command': lambda text: None,
+               'process_tutoring_command': lambda *args, **kwargs: None,
+               'tutor_completion': Mock(), 'study_sessions': Mock(), 'sqlite3': sqlite3,
                'process_repo_command': lambda text: None,
                'process_learning_command': lambda text: None,
                'record_query': lambda *args, **kwargs: None,
@@ -37,3 +41,5 @@ class RouterIntegrationTests(unittest.TestCase):
         self.assertFalse(env['exam_mode'])
         env['process_command']('tylko naprowadzaj')
         self.assertEqual(env['study_style'], 'naprowadzanie')
+        self.assertEqual(env['study_sessions'].configure.call_count, 2)
+        env['study_sessions'].configure.assert_called_with(mode='naprowadzanie')

@@ -28,7 +28,8 @@ from skills.scheduled_briefing import briefing_status
 from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
 from skills.tasks import pending_tasks
-from skills.web_commands import submit_command
+from skills.web_commands import submit_command, command_result
+from skills import study_sessions
 from skills import repo_workspace
 from skills import user_learning
 
@@ -481,6 +482,24 @@ def health():
 @app.get("/api/flashcards/status")
 def flashcards_status():
     return flashcard_stats()
+
+
+@app.get("/study")
+def study_page():
+    return HTMLResponse((HTML_FILE.parent / "study.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/study/session")
+def study_session_status():
+    return {"current": study_sessions.current(), "recent": study_sessions.recent(10)}
+
+
+@app.get("/api/commands/{command_id}")
+def web_command_result(command_id: int):
+    result = command_result(command_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono polecenia.")
+    return result
 
 
 @app.post("/api/command")
