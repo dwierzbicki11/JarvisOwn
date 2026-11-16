@@ -195,6 +195,22 @@ def delete_latest():
     return row[1]
 
 
+MONTH_ALIASES = {
+    1: ("styczen", "stycznia"),
+    2: ("luty", "lutego"),
+    3: ("marzec", "marca"),
+    4: ("kwiecien", "kwietnia"),
+    5: ("maj", "maja"),
+    6: ("czerwiec", "czerwca"),
+    7: ("lipiec", "lipca"),
+    8: ("sierpien", "sierpnia"),
+    9: ("wrzesien", "wrzesnia"),
+    10: ("pazdziernik", "pazdziernika"),
+    11: ("listopad", "listopada"),
+    12: ("grudzien", "grudnia"),
+}
+
+
 WEEKDAY_ALIASES = {
     0: (
         "poniedzialek",
@@ -318,6 +334,98 @@ def _weekday_date(
     return candidate
 
 
+def _parse_explicit_date(
+    raw,
+):
+    normalized = _normalize_words(
+        raw
+    )
+
+    numeric = re.search(
+        r"\b([0-3]?\d)[./-]([01]?\d)"
+        r"(?:[./-](\d{4}))?\b",
+        normalized,
+    )
+
+    if numeric:
+        day = int(
+            numeric.group(1)
+        )
+        month = int(
+            numeric.group(2)
+        )
+        year = (
+            int(
+                numeric.group(3)
+            )
+            if numeric.group(3)
+            else None
+        )
+
+        return {
+            "day": day,
+            "month": month,
+            "year": year,
+        }
+
+    for month, aliases in MONTH_ALIASES.items():
+        alias_group = "|".join(
+            re.escape(alias)
+            for alias in aliases
+        )
+
+        match = re.search(
+            rf"\b([0-3]?\d)\s+(?:{alias_group})"
+            r"(?:\s+(\d{4}))?\b",
+            normalized,
+        )
+
+        if match:
+            return {
+                "day": int(
+                    match.group(1)
+                ),
+                "month": month,
+                "year": (
+                    int(
+                        match.group(2)
+                    )
+                    if match.group(2)
+                    else None
+                ),
+            }
+
+    return None
+
+
+def _without_explicit_date(
+    raw,
+):
+    value = re.sub(
+        r"\b[0-3]?\d[./-][01]?\d"
+        r"(?:[./-]\d{4})?\b",
+        " ",
+        raw,
+    )
+
+    month_words = "|".join(
+        re.escape(alias)
+        for aliases in MONTH_ALIASES.values()
+        for alias in aliases
+    )
+
+    value = re.sub(
+        rf"\b[0-3]?\d\s+(?:{month_words})"
+        r"(?:\s+\d{4})?\b",
+        " ",
+        _normalize_words(
+            value
+        ),
+    )
+
+    return value
+
+
 def _parse_time(
     raw,
 ):
@@ -439,12 +547,18 @@ def parse_task_command(
     ):
         day_offset = 0
 
+    explicit_date = _parse_explicit_date(
+        body
+    )
+
     weekday = _requested_weekday(
         body
     )
 
     time_value = _parse_time(
-        body
+        _without_explicit_date(
+            body
+        )
     )
 
     hour, minute = (
@@ -456,7 +570,37 @@ def parse_task_command(
         )
     )
 
-    if day_offset is not None:
+    if explicit_date is not None:
+        year = (
+            explicit_date["year"]
+            if explicit_date["year"] is not None
+            else now.year
+        )
+
+        try:
+            due_at = datetime(
+                year,
+                explicit_date["month"],
+                explicit_date["day"],
+                hour,
+                minute,
+                tzinfo=TIMEZONE,
+            )
+        except ValueError:
+            return None
+
+        if (
+            explicit_date["year"] is None
+            and due_at <= now
+        ):
+            try:
+                due_at = due_at.replace(
+                    year=due_at.year + 1
+                )
+            except ValueError:
+                return None
+
+    elif day_offset is not None:
         target_date = (
             now.date()
             + timedelta(
@@ -497,6 +641,26 @@ def parse_task_command(
             )
 
     # Usuń fragment czasu z treści samego zadania.
+    body = re.sub(
+        r"\b[0-3]?\d[./-][01]?\d"
+        r"(?:[./-]\d{4})?\b",
+        " ",
+        body,
+    )
+    body = re.sub(
+        (
+            r"\b[0-3]?\d\s+"
+            r"(?:stycznia|styczen|lutego|luty|marca|marzec|"
+            r"kwietnia|kwiecien|maja|maj|czerwca|czerwiec|"
+            r"lipca|lipiec|sierpnia|sierpien|września|wrzesnia|wrzesien|"
+            r"października|pazdziernika|pazdziernik|"
+            r"listopada|listopad|grudnia|grudzien)"
+            r"(?:\s+\d{4})?\b"
+        ),
+        " ",
+        body,
+        flags=re.IGNORECASE,
+    )
     body = re.sub(
         r"\bza\s+\d{1,3}\s+(?:dni|dzień|dzien)\b",
         " ",
