@@ -27,6 +27,7 @@ from skills.reminders import pending_reminders
 from skills.scheduled_briefing import briefing_status
 from skills.system_health import raid_status, wifi_status
 from skills.study_rag import index_status as study_index_status
+from skills.study_coach import build_snapshot as study_coach_snapshot
 from skills.tasks import pending_tasks
 from skills.web_commands import submit_command
 from skills import repo_workspace
@@ -660,6 +661,12 @@ def status():
             "study",
             30,
             study_index_status,
+        ),
+        "study_coach": cached_background(
+            "study_coach",
+            30,
+            study_coach_snapshot,
+            default={},
         ),
         "headphones": cached_background(
             "headphones",
