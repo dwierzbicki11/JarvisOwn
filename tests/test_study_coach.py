@@ -184,6 +184,37 @@ class StudyCoachTests(unittest.TestCase):
         )
 
     @patch(
+        "skills.study_coach.start_focus",
+        return_value={
+            "minutes": 50,
+        },
+    )
+    @patch(
+        "skills.study_coach.format_study_plan",
+        return_value="Plan nauki na 50 minut: fiszki 10; matematyka 40.",
+    )
+    def test_voice_start_smart_plan(
+        self,
+        formatter,
+        starter,
+    ):
+        answer = study_coach.process_study_coach_command(
+            "Zacznij plan nauki na 50 minut"
+        )
+
+        formatter.assert_called_once_with(
+            50
+        )
+        starter.assert_called_once_with(
+            50,
+            label="plan nauki",
+        )
+        self.assertIn(
+            "Uruchomiłem sesję skupienia",
+            answer,
+        )
+
+    @patch(
         "skills.study_coach.format_study_plan",
         return_value="Plan nauki na 60 minut.",
     )
