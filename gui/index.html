@@ -335,6 +335,27 @@ async function update(){
         ? "Materiały: błąd indeksu"
         : `Materiały: ${study.files??0} plików • ${study.chunks??0} fragmentów`;
 
+    const coach=data.study_coach||{};
+    const coachCards=coach.flashcards||{};
+    const coachSubjects=coach.neglected_subjects||[];
+    const coachTasks=coach.study_tasks||[];
+    const coachParts=[];
+
+    if((coachCards.due||0)>0){
+      coachParts.push(`fiszki: ${coachCards.due}`);
+    }
+    if(coachTasks.length){
+      coachParts.push(`zadanie: ${coachTasks[0].text}`);
+    }
+    if(coachSubjects.length){
+      coachParts.push(`powtórz: ${coachSubjects[0].subject}`);
+    }
+
+    document.getElementById("study-coach").textContent=
+      coachParts.length
+        ? "Study Coach • "+coachParts.join(" • ")
+        : "Study Coach • brak zaległości";
+
     document.getElementById("transport").textContent=data.transport||"Brak danych";
 
     const proactive=data.proactive||{};
