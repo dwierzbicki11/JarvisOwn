@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from skills.flashcards import list_cards, stats as flashcard_stats
+from skills.focus import start_focus
 from skills.study_progress import summary as study_summary
 from skills.tasks import pending_tasks
 
@@ -266,6 +267,32 @@ def format_study_plan(minutes=45, *, now=None):
 
 def process_study_coach_command(text):
     lower = re.sub(r"\s+", " ", (text or "").lower()).strip()
+
+    if any(
+        phrase in lower
+        for phrase in (
+            "zacznij plan nauki",
+            "uruchom plan nauki",
+            "zacznij inteligentną sesję nauki",
+            "zacznij inteligentna sesje nauki",
+        )
+    ):
+        match = re.search(
+            r"(\d{1,3})\s*(?:minut|min)",
+            lower,
+        )
+        minutes = int(match.group(1)) if match else 45
+        plan_text = format_study_plan(minutes)
+        session = start_focus(
+            minutes,
+            label="plan nauki",
+        )
+        return (
+            plan_text
+            + " Uruchomiłem sesję skupienia na "
+            + str(session["minutes"])
+            + " minut."
+        )
 
     if any(
         phrase in lower
