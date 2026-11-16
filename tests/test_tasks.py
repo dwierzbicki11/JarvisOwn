@@ -100,6 +100,66 @@ class TaskTests(unittest.TestCase):
             expected,
         )
 
+    def test_parse_relative_days_task(self):
+        before = datetime.now(
+            tasks.TIMEZONE
+        )
+
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie za 3 dni o 17:15 oddać projekt"
+        )
+
+        self.assertIsNotNone(
+            parsed
+        )
+        self.assertEqual(
+            parsed["text"],
+            "oddać projekt",
+        )
+        self.assertEqual(
+            parsed["due_at"].date(),
+            (
+                before.date()
+                + tasks.timedelta(
+                    days=3
+                )
+            ),
+        )
+        self.assertEqual(
+            parsed["due_at"].hour,
+            17,
+        )
+        self.assertEqual(
+            parsed["due_at"].minute,
+            15,
+        )
+
+    def test_parse_next_week_task(self):
+        before = datetime.now(
+            tasks.TIMEZONE
+        )
+
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie za tydzień o 20:00 powtórzyć analizę"
+        )
+
+        self.assertIsNotNone(
+            parsed
+        )
+        self.assertEqual(
+            parsed["text"],
+            "powtórzyć analizę",
+        )
+        self.assertEqual(
+            parsed["due_at"].date(),
+            (
+                before.date()
+                + tasks.timedelta(
+                    days=7
+                )
+            ),
+        )
+
     def test_due_notice_only_once(self):
         due = datetime.now(tasks.TIMEZONE)
         tasks.add_task("wysłać raport", due_at=due, priority=True)
