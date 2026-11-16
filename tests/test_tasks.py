@@ -160,6 +160,97 @@ class TaskTests(unittest.TestCase):
             ),
         )
 
+    def test_parse_numeric_date_task(self):
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie na 20.11.2026 o 18:30 oddać projekt"
+        )
+
+        self.assertIsNotNone(
+            parsed
+        )
+        self.assertEqual(
+            parsed["text"],
+            "oddać projekt",
+        )
+        self.assertEqual(
+            parsed["due_at"].year,
+            2026,
+        )
+        self.assertEqual(
+            parsed["due_at"].month,
+            11,
+        )
+        self.assertEqual(
+            parsed["due_at"].day,
+            20,
+        )
+        self.assertEqual(
+            parsed["due_at"].hour,
+            18,
+        )
+        self.assertEqual(
+            parsed["due_at"].minute,
+            30,
+        )
+
+    def test_parse_polish_month_date_task(self):
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie na 20 listopada 2026 o 19:15 zrobić laboratorium"
+        )
+
+        self.assertIsNotNone(
+            parsed
+        )
+        self.assertEqual(
+            parsed["text"],
+            "zrobić laboratorium",
+        )
+        self.assertEqual(
+            parsed["due_at"].month,
+            11,
+        )
+        self.assertEqual(
+            parsed["due_at"].day,
+            20,
+        )
+        self.assertEqual(
+            parsed["due_at"].hour,
+            19,
+        )
+        self.assertEqual(
+            parsed["due_at"].minute,
+            15,
+        )
+
+    def test_numeric_date_is_not_mistaken_for_time(self):
+        parsed = tasks.parse_task_command(
+            "Dodaj zadanie na 20.11 oddać sprawozdanie"
+        )
+
+        self.assertIsNotNone(
+            parsed
+        )
+        self.assertEqual(
+            parsed["text"],
+            "oddać sprawozdanie",
+        )
+        self.assertEqual(
+            parsed["due_at"].month,
+            11,
+        )
+        self.assertEqual(
+            parsed["due_at"].day,
+            20,
+        )
+        self.assertEqual(
+            parsed["due_at"].hour,
+            20,
+        )
+        self.assertEqual(
+            parsed["due_at"].minute,
+            0,
+        )
+
     def test_due_notice_only_once(self):
         due = datetime.now(tasks.TIMEZONE)
         tasks.add_task("wysłać raport", due_at=due, priority=True)
