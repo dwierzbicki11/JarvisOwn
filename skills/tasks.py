@@ -642,14 +642,15 @@ def parse_task_command(
 
     # Usuń fragment czasu z treści samego zadania.
     body = re.sub(
-        r"\b[0-3]?\d[./-][01]?\d"
+        r"\b(?:na\s+)?[0-3]?\d[./-][01]?\d"
         r"(?:[./-]\d{4})?\b",
         " ",
         body,
+        flags=re.IGNORECASE,
     )
     body = re.sub(
         (
-            r"\b[0-3]?\d\s+"
+            r"\b(?:na\s+)?[0-3]?\d\s+"
             r"(?:stycznia|styczen|lutego|luty|marca|marzec|"
             r"kwietnia|kwiecien|maja|maj|czerwca|czerwiec|"
             r"lipca|lipiec|sierpnia|sierpien|września|wrzesnia|wrzesien|"
