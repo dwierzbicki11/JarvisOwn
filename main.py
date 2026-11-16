@@ -89,6 +89,10 @@ from skills.study_materials import (
     search_materials,
 )
 from skills.study_progress import format_summary, record_interaction
+from skills.study_coach import (
+    build_snapshot as study_coach_snapshot,
+    process_study_coach_command,
+)
 from skills.study_rag import (
     build_context,
     index_status as study_index_status,
@@ -1878,6 +1882,16 @@ def process_command(text):
     flashcard_reply = process_flashcard_command(text)
     if flashcard_reply is not None:
         return flashcard_reply
+
+    study_coach_reply = process_study_coach_command(
+        text
+    )
+    if study_coach_reply is not None:
+        print(
+            "🎯 INTENT study_coach",
+            flush=True,
+        )
+        return study_coach_reply
 
     control = study_control(text)
     if control:
