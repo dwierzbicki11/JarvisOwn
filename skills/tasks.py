@@ -392,8 +392,33 @@ def parse_task_command(
     due_at = None
 
     day_offset = None
+    normalized_body = _normalize_words(
+        body
+    )
 
-    if re.search(
+    relative_days = re.search(
+        r"\bza\s+(\d{1,3})\s+(?:dni|dzien)\b",
+        normalized_body,
+    )
+
+    if relative_days:
+        day_offset = max(
+            1,
+            min(
+                int(
+                    relative_days.group(1)
+                ),
+                365,
+            ),
+        )
+
+    elif re.search(
+        r"\bza\s+tydzien\b",
+        normalized_body,
+    ):
+        day_offset = 7
+
+    elif re.search(
         r"\bpojutrze\b",
         body,
         flags=re.IGNORECASE,
@@ -472,6 +497,18 @@ def parse_task_command(
             )
 
     # Usuń fragment czasu z treści samego zadania.
+    body = re.sub(
+        r"\bza\s+\d{1,3}\s+(?:dni|dzień|dzien)\b",
+        " ",
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        r"\bza\s+tydzień\b|\bza\s+tydzien\b",
+        " ",
+        body,
+        flags=re.IGNORECASE,
+    )
     body = re.sub(
         r"\b(?:na\s+)?pojutrze\b",
         " ",
