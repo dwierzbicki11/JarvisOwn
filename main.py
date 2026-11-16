@@ -91,6 +91,7 @@ from skills.study_materials import (
 from skills.study_progress import format_summary, record_interaction
 from skills.study_coach import (
     build_snapshot as study_coach_snapshot,
+    format_recommendation as study_coach_recommendation,
     process_study_coach_command,
 )
 from skills.study_rag import (
@@ -1156,6 +1157,17 @@ def today_brief():
             flush=True,
         )
 
+    try:
+        parts.append(
+            study_coach_recommendation()
+        )
+    except Exception as exc:
+        print(
+            f"[BRIEF STUDY COACH ERROR] "
+            f"{exc}",
+            flush=True,
+        )
+
     return " ".join(
         part
         for part in parts
@@ -1227,6 +1239,17 @@ def tomorrow_brief():
     except Exception as exc:
         print(
             f"[BRIEF TASK ERROR] "
+            f"{exc}",
+            flush=True,
+        )
+
+    try:
+        parts.append(
+            study_coach_recommendation()
+        )
+    except Exception as exc:
+        print(
+            f"[BRIEF STUDY COACH ERROR] "
             f"{exc}",
             flush=True,
         )
